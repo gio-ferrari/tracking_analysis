@@ -37,7 +37,7 @@ plt.close('all')
 # Parameters
 ABS_TIME_CONVERSION = 1e-3
 K, step_nm = 4, 1
-background_rate, tcspc_binning = 4945, 0.01 #[Hz],[s]
+background_rate, tcspc_binning = 7785, 0.01 #[Hz],[s]
 lifetime_win_i, lifetime_win_f = 0, 5
 
 def gauss(x, a, mu, sigma):
@@ -46,7 +46,8 @@ def gauss(x, a, mu, sigma):
 # Open fitted experimental PSFs
 #psf_dir = 'C:\\Users\\Cibion\\Pictures\\Data\\20250124\\psf_20250124_16_Resultados\\fit' #Warning! Change by your own folder
 # psf_dir = 'C:\\Data\\20250117\\psf_20250117_13_Resultados\\fit'
-psf_dir = 'C:\\Data\\20250204\\psf_20250204_2\\fit_rotada'
+#psf_dir = 'C:\\Data\\20250204\\psf_20250204_2\\fit_rotada'
+psf_dir = 'C:\\Data\\20250205\\psf_20250205_2\\fit_rotada'
 psf_fit, pos_min = [], []
 
 for fname in os.listdir(psf_dir):
@@ -90,10 +91,32 @@ plt.show()
 #%% Load data from Swabian TimeTagger
 #tcspc_file =  r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_square_20nm_5s_por_sitio_20250124_20250124-191744_.npy" # Cuadrado lindo 
 #tcspc_file =  r"C:\Data\20250124\minflux_test_square_20nm_5s_por_sitio_20250124_20250124-191744_.npy" # Cuadrado lindo 
-tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-221337__20250204-221428_.npy'
+
+#tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-221337__20250204-221428_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-221501_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-221337_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-221257_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-221144_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center3_20250204_20250204-221056_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center3_20250204_20250204-221003_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center3_20250204_20250204-220933_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center2_20250204_20250204-220831_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center2_20250204_20250204-220752_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center2_20250204_20250204-220706_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center2_20250204_20250204-220621_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center1_20250204_20250204-220518_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center1_20250204_20250204-220436_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center1_20250204_20250204-220406_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center1_20250204_20250204-220318_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-220225_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-220133_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-215826__20250204-215858__20250204-220045_.npy'
+#tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-215826__20250204-215858_.npy'
+tcspc_file = r'C:\Data\20250205\test_fitandmove_dona4_20250205-191418_.npy'
+#tcspc_file = r'C:\Data\20250205\minflux_bkg_20250205_20250205-194702_.npy'
 all_data = np.load(tcspc_file)
-rel_time = all_data[:, 2] #antes 0
-abs_time = all_data[:, 1]
+rel_time = all_data[2,:] #antes 0
+abs_time = all_data[1,:]
 
 abs_time_s = (abs_time - abs_time.min()) / 1e12 # Paso a picosegundos a segundos y refiero al inicio
 plt.figure("Histogram_abs_time")
