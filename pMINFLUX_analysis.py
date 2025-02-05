@@ -27,6 +27,8 @@ This code still requires adaptation for tracking experiments using Swabian hardw
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.patches import Ellipse
 from PIL import Image
 from tools import tools_pMINFLUX as tools
 from scipy.optimize import curve_fit
@@ -42,7 +44,9 @@ def gauss(x, a, mu, sigma):
     return a * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
 
 # Open fitted experimental PSFs
-psf_dir = 'C:\\Users\\Cibion\\Pictures\\Data\\20250124\\psf_20250124_16_Resultados\\fit' #Warning! Change by your own folder
+#psf_dir = 'C:\\Users\\Cibion\\Pictures\\Data\\20250124\\psf_20250124_16_Resultados\\fit' #Warning! Change by your own folder
+# psf_dir = 'C:\\Data\\20250117\\psf_20250117_13_Resultados\\fit'
+psf_dir = 'C:\\Data\\20250204\\psf_20250204_2\\fit_rotada'
 psf_fit, pos_min = [], []
 
 for fname in os.listdir(psf_dir):
@@ -60,66 +64,62 @@ print("pos_min: ", pos_min)
 colors = ['blue', 'orange', 'gray', 'yellow']
 
 # Plot PSFs with minima positions
-# fig, axes = plt.subplots(2, 2, figsize=(8, 8))
-# for i, ax in enumerate(axes.flat):
-#     ax.set(xlabel = 'x (nm)', ylabel= 'y (nm)')
-#     ax.imshow(psf_fit[i], cmap='viridis')
-#     ax.scatter(*np.unravel_index(np.argmin(psf_fit[i]), psf_fit[i].shape)[::-1], 
-#                 color=colors[i], s=100)
-#     ax.set_title(f'Fitted PSF {i}', fontsize=10)
-# plt.tight_layout()
+fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+for i, ax in enumerate(axes.flat):
+    ax.set(xlabel = 'x (nm)', ylabel= 'y (nm)')
+    ax.imshow(psf_fit[i], cmap='viridis')
+    ax.scatter(*np.unravel_index(np.argmin(psf_fit[i]), psf_fit[i].shape)[::-1], 
+                color=colors[i], s=100)
+    ax.set_title(f'Fitted PSF {i}', fontsize=10)
+plt.tight_layout()
 
 # #Plot EBP
-# x_min, y_min = pos_min[:, 0], pos_min[:, 1]
-# plt.figure('EBP')
-# for i in range(len(pos_min)):
-#     plt.scatter(x_min[i]- pos_min[0][0], y_min[i] - pos_min[0][1], c=colors[i], label=f'Dona {i+1}')
-# plt.title('EBP')
-# plt.xlabel('x (nm)')
-# plt.ylabel('y (nm)')
-# plt.axhline(0, color='gray', linestyle='--', linewidth=0.5)  # Línea horizontal en y=0
-# plt.axvline(0, color='gray', linestyle='--', linewidth=0.5)  # Línea vertical en x=0
-# plt.legend()
-# plt.axis("equal")
-# plt.grid(True)
-# plt.show()
-#%% Load TCSPC data from PH300 # Delete in near future!
-# #tcspc_file = r'\\192.168.114.21\na\Florencia Choque\Data\20241122\Medicion_cuadrado_3\filename_arrays.txt'
-# #tcspc_file = r'C:\Users\Cibion\Pictures\Data\20241122\Medicion_cuadrado_3\filename_arrays.txt' #square
-# #tcspc_file = r'C:\Users\Cibion\Pictures\Data\20250117\filename_10_arrays.txt'
-# tcspc_file = r'C:\Users\Cibion\Pictures\Data\20250120\filename_10_arrays.txt'
-
-# coord = np.loadtxt(tcspc_file, unpack=True)
-# rel_time = coord[0, :]
-# abs_time = coord[1, :] * ABS_TIME_CONVERSION
-
-# duracion = abs_time.max() - abs_time.min()
-# mascara_duracion = (abs_time < abs_time.min() + duracion/3) # (abs_time > abs_time.min() + duracion*.5)
-
-# rel_time = rel_time[mascara_duracion]
-# abs_time = abs_time[mascara_duracion]
-
-# rel_time_new = (rel_time + 17) % 50
-
-# # τ values and histogram
-# τ = np.array([0.2, 13.2, 25.5, 38.7]) # peak positions [ns]
-# plt.figure('Histogram_rel_time')
-# plt.hist([rel_time, rel_time_new], bins=300, label=['rel_time', 'rel_time_new'], alpha=0.7)
-# for tau in τ:
-#     plt.axvline(tau, color='red', linestyle='--')
-#     plt.axvspan(tau + lifetime_win_i, tau + lifetime_win_f, color='red', alpha=0.2)
-# plt.xlabel('Time [ns]'), plt.ylabel('Counts'), plt.legend(), plt.tight_layout()
-# plt.show()
+x_min, y_min = pos_min[:, 0], pos_min[:, 1]
+plt.figure('EBP')
+for i in range(len(pos_min)):
+    plt.scatter(x_min[i]- pos_min[0][0], y_min[i] - pos_min[0][1], c=colors[i], label=f'{i+1}')
+plt.title('EBP')
+plt.xlabel('x (nm)')
+plt.ylabel('y (nm)')
+plt.axhline(0, color='gray', linestyle='--', linewidth=0.5)
+plt.axvline(0, color='gray', linestyle='--', linewidth=0.5)
+plt.legend()
+plt.axis("equal")
+plt.grid(True)
+plt.show()
 #%% Load data from Swabian TimeTagger
-tcspc_file =  r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_square_20nm_5s_por_sitio_20250124_20250124-191744_.npy" # Cuadrado lindo 
-
+#tcspc_file =  r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_square_20nm_5s_por_sitio_20250124_20250124-191744_.npy" # Cuadrado lindo 
+#tcspc_file =  r"C:\Data\20250124\minflux_test_square_20nm_5s_por_sitio_20250124_20250124-191744_.npy" # Cuadrado lindo 
+tcspc_file = r'C:\Data\20250204\minflux_center0_20250204_20250204-221337__20250204-221428_.npy'
 all_data = np.load(tcspc_file)
-rel_time = all_data[:, 0]
+rel_time = all_data[:, 2] #antes 0
 abs_time = all_data[:, 1]
-print("shape: ", rel_time.shape) #, rel_time.size)
+
+abs_time_s = (abs_time - abs_time.min()) / 1e12 # Paso a picosegundos a segundos y refiero al inicio
+plt.figure("Histogram_abs_time")
+plt.hist(abs_time_s, bins=500, alpha=0.7, color='blue')
+plt.xlabel("Time [s]")
+plt.ylabel("Counts")
+plt.title("")
+plt.tight_layout()
+plt.show()
+print("abs shape: ", abs_time.shape)
+print("rel shape: ", rel_time.shape) #, rel_time.size)
 print("Rel max: ", rel_time.max(), "ps")
 print("Tiempo de duración: ", (abs_time.max() - abs_time.min())/1E12, " s") #ps to s
 rel_time = rel_time/1000.0 #ps to ns
+
+duracion = abs_time.max() - abs_time.min()
+inicio_frac = float(input("Ingresa el inicio como fracción de la duración total (0 a 1): "))
+fin_frac = float(input("Ingresa el final como fracción de la duración total (0 a 1): "))
+
+inicio_abs = abs_time.min() + inicio_frac * duracion
+fin_abs = abs_time.min() + fin_frac * duracion
+
+mascara_duracion = (abs_time >= inicio_abs) & (abs_time <= fin_abs)
+rel_time = rel_time[mascara_duracion]
+abs_time = abs_time[mascara_duracion]
+print(f"Datos filtrados en el rango {inicio_frac*100:.1f}% - {fin_frac*100:.1f}% del tiempo total")
 
 rel_time_new = (rel_time - 15.8) % 50 # Modify!
 #τ = np.array([0.2, 13.2, 25.5, 38.7])  # [ns] 
@@ -141,7 +141,6 @@ nbins = int(((abs_time.max()- abs_time.min())/1E12)// tcspc_binning)
 bin_size = len(rel_time_new)//nbins
 print("nbins: ", nbins)
 print('bin_size: ', bin_size)
-#nbins, bin_size = int(np.max(abs_time) / tcspc_binning), len(rel_time_new) // int(np.max(abs_time) / tcspc_binning)
 r0_est_nm, N, SBR = np.zeros((2, nbins)), np.zeros(nbins), np.zeros(nbins)
 
 for i in range(nbins):
@@ -154,63 +153,6 @@ for i in range(nbins):
 x_loc, y_loc = r0_est_nm[0] - pos_min[0][0], r0_est_nm[1] - pos_min[0][1] #Le resto esto porque es la referencia alrededor de la que quiero dibujar.
 meanx, meany = np.mean(x_loc), np.mean(y_loc)
 sigmax, sigmay = np.std(x_loc), np.std(y_loc)
-
-#%%Gaussian fit
-# hist, bin_edges = np.histogram(x_loc, bins=30, density=True)
-# bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-# popt, pcov = curve_fit(gauss, bin_centers, hist, p0=[1, np.mean(x_loc), np.std(x_loc)])
-# a_fit, mu_fit, sigma_fit = popt
-
-# plt.figure()
-# x = np.linspace(min(x_loc), max(x_loc), 1000)
-# plt.hist(x_loc, bins=30, density=True, alpha=0.6, color='g', label='Data')
-# plt.plot(x, gauss(x, *popt), 'r-', label=f'Gaussian\n$\mu={mu_fit:.2f}, \sigma={sigma_fit:.2f}$')
-# plt.xlabel('x (nm)')
-# plt.ylabel('Density')
-# plt.legend()
-# plt.title('Gaussian fit x locs')
-# plt.show()
-
-# hist, bin_edges = np.histogram(y_loc, bins=30, density=True)
-# bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-# popt, pcov = curve_fit(gauss, bin_centers, hist, p0=[1, np.mean(y_loc), np.std(y_loc)])
-# a_fit, mu_fit, sigma_fit = popt
-# plt.figure()
-# x = np.linspace(min(y_loc), max(y_loc), 1000)
-# plt.hist(y_loc, bins=30, density=True, alpha=0.6, color='g', label='Data')
-# plt.plot(x, gauss(x, *popt), 'r-', label=f'Gaussian\n$\mu={mu_fit:.2f}, \sigma={sigma_fit:.2f}$')
-# plt.xlabel('y (nm)')
-# plt.ylabel('Density')
-# plt.legend()
-# plt.title('Gaussian fit y locs')
-# plt.show()
-#%% Trace bins
-abs_time_ms = abs_time/1E12
-times = np.linspace(0, abs_time_ms, nbins) 
-times=range(0,len(x_loc))
-plt.figure()
-plt.plot(times, x_loc, label='x', alpha=0.8, marker='o', markersize=4)
-plt.plot(times, y_loc, label='y', alpha=0.8, marker='o', markersize=4)
-
-plt.xlabel('bins')
-plt.ylabel('Localizations')
-plt.title('Time trace')
-plt.legend()
-plt.grid(True)
-plt.show()
-#%%
-plt.figure() 
-plt.plot(abs_time[:len(x_loc)] / 1E12, x_loc, label='x', alpha=0.8, marker='o', markersize=4)
-plt.plot(abs_time[:len(y_loc)] / 1E12, y_loc, label='y', alpha=0.8, marker='o', markersize=4)
-
-plt.xlabel('Tiempo absoluto [s]')  # Usar tiempo en segundos
-plt.ylabel('Localizaciones [nm]')
-plt.title('Evolución temporal de las localizaciones')
-plt.legend()
-plt.grid(True)
-plt.show()
 #%%
 plt.figure('Localizations')
 for i, p in enumerate(pos_min):
@@ -236,37 +178,30 @@ plt.xlabel('x (nm)'), plt.ylabel('y (nm)'), plt.tight_layout()
 ax = plt.gca()
 ax.get_xlim()
 ax.get_ylim()
+#%% Trace bins
+bins_num=range(0,len(x_loc))
+plt.figure()
+plt.plot(bins_num, x_loc, label='x', alpha=0.8, marker='o', markersize=4)
+plt.plot(bins_num, y_loc, label='y', alpha=0.8, marker='o', markersize=4)
 
-#%% Localization of the first cloud
-plt.figure('Analysis')
-plt.scatter(x_loc[:500], y_loc[:500], c=range(500))
-plt.xlabel('x (nm)'), plt.ylabel('y (nm)'), plt.tight_layout()
-#%% CRB Calculation and Plot
-σ_CRB = tools.crb_minflux(K, psf_fit, np.mean(SBR), step_nm, size_nm, np.mean(N), method='1')
-# Create the CRB plot with the same extent as the scatter plots
-plt.figure('CRB_map')
-plt.imshow(σ_CRB, cmap='viridis', vmin=0, vmax=20)
-plt.colorbar(label = f'σ_CRB Value, <N> = {np.round(np.mean(N), 1)}')
-
-# Plot PSF minima positions with the same color mapping as before
-for i, p in enumerate(pos_min):
-    plt.scatter(*np.unravel_index(np.argmin(psf_fit[i]), psf_fit[i].shape)[::-1], 
-                color=colors[i], s=100)
-
-# Ensure the axes and aspect ratio are the same as in scatter plots
-plt.gca().set_aspect('equal')
-plt.xlabel('x (nm)')
-plt.ylabel('y (nm)')
-plt.title('σ_CRB with Aligned Reference Frame')
-plt.tight_layout()
+plt.xlabel('bins')
+plt.ylabel('Localizations')
+plt.title('Time trace')
+plt.legend()
+plt.grid(True)
 plt.show()
-
-
-#%%
-# Suponiendo que x_loc, y_loc y abs_time ya están definidos
-# Convertimos abs_time a segundos para que sea más manejable
+#%% Trace localizations
 time_seconds_binned = np.array([np.mean(abs_time[i * bin_size : (i + 1) * bin_size]) for i in range(nbins)])  
-time_seconds_binned = (time_seconds_binned - abs_time.min()) / 1e12  # Convierte a segundos
+time_seconds_binned = (time_seconds_binned - abs_time.min()) / 1E12
+plt.figure("Time Trace")
+plt.plot(time_seconds_binned, x_loc, label='x (nm)', marker='o', markersize=4, alpha=0.8)
+plt.plot(time_seconds_binned, y_loc, label='y (nm)', marker='o', markersize=4, alpha=0.8)
+plt.xlabel('Time (s)')
+plt.ylabel('Localizations (nm)')
+plt.title('')
+plt.legend()
+plt.grid(True)
+plt.show()
 
 definir_nubes = True
 nube_ranges = []
@@ -280,18 +215,6 @@ while definir_nubes:
     except ValueError:
         print("Por favor, ingrese valores enteros válidos.")
 
-# Graficar posiciones en función del tiempo absoluto
-plt.figure("Time Trace")
-plt.plot(time_seconds_binned, x_loc, label='x (nm)', marker='o', markersize=4, alpha=0.8)
-plt.plot(time_seconds_binned, y_loc, label='y (nm)', marker='o', markersize=4, alpha=0.8)
-plt.xlabel('Tiempo (s)')
-plt.ylabel('Localización (nm)')
-plt.title('Variación de las Localizaciones en el Tiempo')
-plt.legend()
-plt.grid(True)
-plt.show()
-
-# Analizar cada nube definida
 for i, (start, end) in enumerate(nube_ranges):
     x_nube = x_loc[start:end]
     y_nube = y_loc[start:end]
@@ -311,22 +234,54 @@ for i, (start, end) in enumerate(nube_ranges):
     plt.colorbar(label='Orden Temporal')
     plt.grid(True)
     plt.show()
+    
+    #Gaussian fit
+    hist, bin_edges = np.histogram(x_nube, bins=30, density=True)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    popt, pcov = curve_fit(gauss, bin_centers, hist, p0=[1, np.mean(x_nube), np.std(x_nube)])
+    a_fit, mu_fit, sigma_fit = popt
+
+    plt.figure()
+    x = np.linspace(min(x_nube), max(x_nube), 1000)
+    plt.hist(x_nube, bins=30, density=True, alpha=0.6, color='g', label='Data')
+    plt.plot(x, gauss(x, *popt), 'r-', label=f'Gaussian\n$\mu={mu_fit:.2f}, \sigma={sigma_fit:.2f}$')
+    plt.xlabel('x (nm)')
+    plt.ylabel('Density')
+    plt.legend()
+    plt.title(f'Gaussian fit x locs in Cloud {i}')
+    plt.show()
+
+    hist, bin_edges = np.histogram(y_nube, bins=30, density=True)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    popt, pcov = curve_fit(gauss, bin_centers, hist, p0=[1, np.mean(y_nube), np.std(y_nube)])
+    a_fit, mu_fit, sigma_fit = popt
+    plt.figure()
+    x = np.linspace(min(y_loc), max(y_loc), 1000)
+    plt.hist(y_nube, bins=30, density=True, alpha=0.6, color='g', label='Data')
+    plt.plot(x, gauss(x, *popt), 'r-', label=f'Gaussian\n$\mu={mu_fit:.2f}, \sigma={sigma_fit:.2f}$')
+    plt.xlabel('y (nm)')
+    plt.ylabel('Density')
+    plt.legend()
+    plt.title(f'Gaussian fit y locs in Cloud {i}')
+    plt.show()
 
 #%%
-import matplotlib.patches as patches
 plt.figure('All Localizations with Ellipses')
 
 # Colores para cada nube
 colors = ['blue', 'orange', 'green', 'red', 'purple']
 
 for i, (start_bin, end_bin) in enumerate(nube_ranges):
-    # Extraer localizaciones de la nube actual
     x_nube = x_loc[start_bin:end_bin]
     y_nube = y_loc[start_bin:end_bin]
     
     meanx, meany = np.mean(x_nube), np.mean(y_nube)
     sigmax, sigmay = np.std(x_nube), np.std(y_nube) # Esto creo que no se está calculando bien
-
+    print(f"Nube {i+1}: Bins {start} - {end}")
+    print(f"  Media X: {meanx:.2f} nm, Desviación X: {sigmax:.2f} nm")
+    print(f"  Media Y: {meany:.2f} nm, Desviación Y: {sigmay:.2f} nm")
     plt.scatter(x_nube, y_nube, color=colors[i % len(colors)], alpha=0.4, label=f'Nube {i+1}')
 
     elipse = patches.Ellipse((meanx, meany), 2 * sigmax, 2 * sigmay, edgecolor=colors[i % len(colors)], 
@@ -342,10 +297,6 @@ plt.title('Localizaciones de todas las nubes con elipses de dispersión')
 plt.tight_layout()
 plt.show()
 #%%
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
-
 def plot_ellipse_cov(mean, cov, ax, color='red', alpha=0.3):
     """Dibuja una elipse usando la covarianza."""
     vals, vecs = np.linalg.eigh(cov)
@@ -364,9 +315,8 @@ def plot_ellipse_percentile(x, y, ax, color='blue', alpha=0.3):
                   edgecolor=color, facecolor=color, alpha=alpha)
     ax.add_patch(ell)
 
-# Crear la figura
 fig, ax = plt.subplots(figsize=(6, 6))
-colors = ['blue', 'orange', 'green', 'red', 'purple']
+colors = ['blue','cyan','green', 'orange','red']
 for i, (start, end) in enumerate(nube_ranges):
     x_nube, y_nube = x_loc[start:end], y_loc[start:end]
     mean = [np.mean(x_nube), np.mean(y_nube)]
@@ -375,16 +325,34 @@ for i, (start, end) in enumerate(nube_ranges):
     # Dibujar puntos de la nube
     ax.scatter(x_nube, y_nube, s=10, alpha=0.3, label=f'Nube {i+1}', color=colors[i])
 
-    # Dibujar elipse basada en covarianza
+    # Elipse basada en covarianza
     plot_ellipse_cov(mean, cov, ax, color=colors[i])
 
-    # Dibujar elipse basada en percentiles
+    # Elipse basada en percentiles
     plot_ellipse_percentile(x_nube, y_nube, ax, color='black')
 
-# Ajustes del gráfico
 ax.set_xlabel('x (nm)')
 ax.set_ylabel('y (nm)')
 ax.set_aspect('equal')
 ax.legend()
-plt.title('Comparación de Elipses de Localización')
+plt.title('')
+plt.show()
+#%% CRB Calculation and Plot
+σ_CRB = tools.crb_minflux(K, psf_fit, np.mean(SBR), step_nm, size_nm, np.mean(N), method='1')
+# Create the CRB plot with the same extent as the scatter plots
+plt.figure('CRB_map')
+plt.imshow(σ_CRB, cmap='viridis', vmin=0, vmax=20)
+plt.colorbar(label = f'σ_CRB Value, <N> = {np.round(np.mean(N), 1)}')
+
+# Plot PSF minima positions with the same color mapping as before
+for i, p in enumerate(pos_min):
+    plt.scatter(*np.unravel_index(np.argmin(psf_fit[i]), psf_fit[i].shape)[::-1], 
+                color=colors[i], s=100)
+
+# Ensure the axes and aspect ratio are the same as in scatter plots
+plt.gca().set_aspect('equal')
+plt.xlabel('x (nm)')
+plt.ylabel('y (nm)')
+plt.title('σ_CRB with Aligned Reference Frame')
+plt.tight_layout()
 plt.show()
