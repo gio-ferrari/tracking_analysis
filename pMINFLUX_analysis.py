@@ -35,21 +35,18 @@ plt.close('all')
 # Parameters
 ABS_TIME_CONVERSION = 1e-3
 K, step_nm = 4, 1
-background_rate, tcspc_binning = 4945, 0.5 #[Hz],[s]
+background_rate, tcspc_binning = 4945, 0.01 #[Hz],[s]
 lifetime_win_i, lifetime_win_f = 0, 5
 
 def gauss(x, a, mu, sigma):
     return a * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
 
 # Open fitted experimental PSFs
-#psf_dir = 'C:\\Users\\Cibion\\Pictures\\Data\\20241122\\psf_20241122_1_Resultados\\fit' #Fitted images square
-#psf_dir = r'\\192.168.114.21\\Fileserver\na\Florencia Choque\Data\20250117\psf_20250117_13_Resultados\fit'
-psf_dir = 'C:\\Users\\Cibion\\Pictures\\Data\\20250124\\psf_20250124_16_Resultados\\fit' #OJO! cambiar aquí
+psf_dir = 'C:\\Users\\Cibion\\Pictures\\Data\\20250124\\psf_20250124_16_Resultados\\fit' #Warning! Change by your own folder
 psf_fit, pos_min = [], []
 
 for fname in os.listdir(psf_dir):
     if fname.lower().endswith((".tiff", ".tif")):
-        print(fname)
         img = np.array(Image.open(os.path.join(psf_dir, fname)))
         psf_fit.append(img)
         size = np.shape(img)[1]
@@ -63,14 +60,15 @@ print("pos_min: ", pos_min)
 colors = ['blue', 'orange', 'gray', 'yellow']
 
 # Plot PSFs with minima positions
-fig, axes = plt.subplots(2, 2, figsize=(8, 8))
-for i, ax in enumerate(axes.flat):
-    ax.set(xlabel = 'x (nm)', ylabel= 'y (nm)')
-    ax.imshow(psf_fit[i], cmap='viridis')
-    ax.scatter(*np.unravel_index(np.argmin(psf_fit[i]), psf_fit[i].shape)[::-1], 
-                color=colors[i], s=100)
-    ax.set_title(f'Fitted PSF {i}', fontsize=10)
-plt.tight_layout()
+# fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+# for i, ax in enumerate(axes.flat):
+#     ax.set(xlabel = 'x (nm)', ylabel= 'y (nm)')
+#     ax.imshow(psf_fit[i], cmap='viridis')
+#     ax.scatter(*np.unravel_index(np.argmin(psf_fit[i]), psf_fit[i].shape)[::-1], 
+#                 color=colors[i], s=100)
+#     ax.set_title(f'Fitted PSF {i}', fontsize=10)
+# plt.tight_layout()
+
 # #Plot EBP
 # x_min, y_min = pos_min[:, 0], pos_min[:, 1]
 # plt.figure('EBP')
@@ -112,37 +110,16 @@ plt.tight_layout()
 #     plt.axvspan(tau + lifetime_win_i, tau + lifetime_win_f, color='red', alpha=0.2)
 # plt.xlabel('Time [ns]'), plt.ylabel('Counts'), plt.legend(), plt.tight_layout()
 # plt.show()
-#%% Load data from Swabian
-#Archivos mediciones minflux: posición de los pulsos
-# tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\20240124_Minflux\filename_20250124-184416_.npy" #Dona 4
-# tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\20240124_Minflux\filename_20250124-184401_.npy" #Dona 3
-# tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\20240124_Minflux\filename_20250124-184330_.npy" #Dona 2
-# tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\20240124_Minflux\filename_20250124-184308_.npy" #Dona 1
-
-#tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\20240124_Minflux\filename_20250124-183608_.npy" #centro en Dona 0
-#tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\20240124_Minflux\filename_20250124-183802_.npy" # centro en Dona 1
-#tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\20240124_Minflux\filename_20250124-183929_.npy" #centro en Dona 2
-#tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\20240124_Minflux\filename_20250124-184104_.npy" #centro en Dona 3
-
-#Uso módulo minflux
-#tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\standard_10s_center_20250124_20250124-192807_.npy" #Queda como a 70 nm del centro, hice escaneo grande?
-#tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_triangle_30nm_5s_por_sitio_20250124_20250124-192545_.npy"
-#tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_triangle_20nm_5s_por_sitio_20250124_20250124-192410_.npy" #Este triángulo dio bien
-#tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_square_20nm_5s_por_sitio_20250124_20250124-192159_.npy" #Cuadrado OK
-tcspc_file = r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_square_20nm_5s_por_sitio_20250124_20250124-191936_.npy" #Cuadrado con datos raros por fuera
-#tcspc_file =  r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_square_20nm_5s_por_sitio_20250124_20250124-191744_.npy" # Cuadrado lindo 
-#tcspc_file =  r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_square_20250124_20250124-191442_.npy" #cuadrado de 30 nm da bien
-#tcspc_file =  r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_square_20250124_20250124-190936_.npy" #cuadrado de 30 nm da bien
-#tcspc_file =  r"C:\Users\Cibion\Pictures\Data\20250124\minflux_20250124_20250124-185453_.npy"
+#%% Load data from Swabian TimeTagger
+tcspc_file =  r"C:\Users\Cibion\Pictures\Data\20250124\minflux_test_square_20nm_5s_por_sitio_20250124_20250124-191744_.npy" # Cuadrado lindo 
 
 all_data = np.load(tcspc_file)
 rel_time = all_data[:, 0]
 abs_time = all_data[:, 1]
 print("shape: ", rel_time.shape) #, rel_time.size)
 print("Rel max: ", rel_time.max(), "ps")
-print("Abs max: ", abs_time.max(), "Abs min: ", abs_time.min(), (abs_time.max()- abs_time.min())/1E12 ) #ps a s
-print("Tiempo de duración: ", (abs_time.max() - abs_time.min())/1E9, " ms.")
-rel_time = rel_time/1000.0 #ns
+print("Tiempo de duración: ", (abs_time.max() - abs_time.min())/1E12, " s") #ps to s
+rel_time = rel_time/1000.0 #ps to ns
 
 rel_time_new = (rel_time - 15.8) % 50 # Modify!
 #τ = np.array([0.2, 13.2, 25.5, 38.7])  # [ns] 
@@ -160,7 +137,6 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 #%% Estimate Positions
-
 nbins = int(((abs_time.max()- abs_time.min())/1E12)// tcspc_binning)
 bin_size = len(rel_time_new)//nbins
 print("nbins: ", nbins)
@@ -174,11 +150,8 @@ for i in range(nbins):
     n_array = tools.n_minflux(τ, window, lifetime_win_i, lifetime_win_f)
     N[i] = np.sum(n_array)
     _, r0_est_nm[:, i], _ = tools.pos_minflux(n_array, psf_fit, SBR[i], step_nm) #Already in nm, check pos_minflux
-    print(f"r0_est_nm[:,{i}]: ", r0_est_nm[:,i]) #Estas son las localizaciones de los puntos encontrados, tengo que pensar dónde cambia de posición
     
 x_loc, y_loc = r0_est_nm[0] - pos_min[0][0], r0_est_nm[1] - pos_min[0][1] #Le resto esto porque es la referencia alrededor de la que quiero dibujar.
-# Entiendo que La estadística puede hacerse sobre estos puntos x_loc e y_loc
-print(x_loc,y_loc)
 meanx, meany = np.mean(x_loc), np.mean(y_loc)
 sigmax, sigmay = np.std(x_loc), np.std(y_loc)
 
@@ -213,16 +186,28 @@ sigmax, sigmay = np.std(x_loc), np.std(y_loc)
 # plt.legend()
 # plt.title('Gaussian fit y locs')
 # plt.show()
-#%% Trace
-times = np.linspace(0, abs_time, nbins)  
-# Graficar las localizaciones en función del tiempo
-plt.figure()#figsize=(10, 6))
+#%% Trace bins
+abs_time_ms = abs_time/1E12
+times = np.linspace(0, abs_time_ms, nbins) 
+times=range(0,len(x_loc))
+plt.figure()
 plt.plot(times, x_loc, label='x', alpha=0.8, marker='o', markersize=4)
 plt.plot(times, y_loc, label='y', alpha=0.8, marker='o', markersize=4)
 
-plt.xlabel('time (s)')
+plt.xlabel('bins')
 plt.ylabel('Localizations')
 plt.title('Time trace')
+plt.legend()
+plt.grid(True)
+plt.show()
+#%%
+plt.figure() 
+plt.plot(abs_time[:len(x_loc)] / 1E12, x_loc, label='x', alpha=0.8, marker='o', markersize=4)
+plt.plot(abs_time[:len(y_loc)] / 1E12, y_loc, label='y', alpha=0.8, marker='o', markersize=4)
+
+plt.xlabel('Tiempo absoluto [s]')  # Usar tiempo en segundos
+plt.ylabel('Localizaciones [nm]')
+plt.title('Evolución temporal de las localizaciones')
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -252,6 +237,10 @@ ax = plt.gca()
 ax.get_xlim()
 ax.get_ylim()
 
+#%% Localization of the first cloud
+plt.figure('Analysis')
+plt.scatter(x_loc[:500], y_loc[:500], c=range(500))
+plt.xlabel('x (nm)'), plt.ylabel('y (nm)'), plt.tight_layout()
 #%% CRB Calculation and Plot
 σ_CRB = tools.crb_minflux(K, psf_fit, np.mean(SBR), step_nm, size_nm, np.mean(N), method='1')
 # Create the CRB plot with the same extent as the scatter plots
@@ -270,4 +259,132 @@ plt.xlabel('x (nm)')
 plt.ylabel('y (nm)')
 plt.title('σ_CRB with Aligned Reference Frame')
 plt.tight_layout()
+plt.show()
+
+
+#%%
+# Suponiendo que x_loc, y_loc y abs_time ya están definidos
+# Convertimos abs_time a segundos para que sea más manejable
+time_seconds_binned = np.array([np.mean(abs_time[i * bin_size : (i + 1) * bin_size]) for i in range(nbins)])  
+time_seconds_binned = (time_seconds_binned - abs_time.min()) / 1e12  # Convierte a segundos
+
+definir_nubes = True
+nube_ranges = []
+while definir_nubes:
+    try:
+        start_bin = int(input("Ingrese el bin de inicio de la nube (o -1 para terminar): "))
+        if start_bin == -1:
+            break
+        end_bin = int(input("Ingrese el bin de fin de la nube: "))
+        nube_ranges.append((start_bin, end_bin))
+    except ValueError:
+        print("Por favor, ingrese valores enteros válidos.")
+
+# Graficar posiciones en función del tiempo absoluto
+plt.figure("Time Trace")
+plt.plot(time_seconds_binned, x_loc, label='x (nm)', marker='o', markersize=4, alpha=0.8)
+plt.plot(time_seconds_binned, y_loc, label='y (nm)', marker='o', markersize=4, alpha=0.8)
+plt.xlabel('Tiempo (s)')
+plt.ylabel('Localización (nm)')
+plt.title('Variación de las Localizaciones en el Tiempo')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Analizar cada nube definida
+for i, (start, end) in enumerate(nube_ranges):
+    x_nube = x_loc[start:end]
+    y_nube = y_loc[start:end]
+    
+    mean_x, std_x = np.mean(x_nube), np.std(x_nube)
+    mean_y, std_y = np.mean(y_nube), np.std(y_nube)
+    
+    print(f"Nube {i+1}: Bins {start} - {end}")
+    print(f"  Media X: {mean_x:.2f} nm, Desviación X: {std_x:.2f} nm")
+    print(f"  Media Y: {mean_y:.2f} nm, Desviación Y: {std_y:.2f} nm")
+    
+    plt.figure(f"Nube {i+1}")
+    plt.scatter(x_nube, y_nube, c=range(len(x_nube)), cmap='rainbow', s=20)
+    plt.xlabel('x (nm)')
+    plt.ylabel('y (nm)')
+    plt.title(f'Nube {i+1} de Localizaciones')
+    plt.colorbar(label='Orden Temporal')
+    plt.grid(True)
+    plt.show()
+
+#%%
+import matplotlib.patches as patches
+plt.figure('All Localizations with Ellipses')
+
+# Colores para cada nube
+colors = ['blue', 'orange', 'green', 'red', 'purple']
+
+for i, (start_bin, end_bin) in enumerate(nube_ranges):
+    # Extraer localizaciones de la nube actual
+    x_nube = x_loc[start_bin:end_bin]
+    y_nube = y_loc[start_bin:end_bin]
+    
+    meanx, meany = np.mean(x_nube), np.mean(y_nube)
+    sigmax, sigmay = np.std(x_nube), np.std(y_nube) # Esto creo que no se está calculando bien
+
+    plt.scatter(x_nube, y_nube, color=colors[i % len(colors)], alpha=0.4, label=f'Nube {i+1}')
+
+    elipse = patches.Ellipse((meanx, meany), 2 * sigmax, 2 * sigmay, edgecolor=colors[i % len(colors)], 
+                              facecolor='none', linewidth=2, linestyle='--')
+    plt.gca().add_patch(elipse)
+    plt.scatter(meanx, meany, color=colors[i % len(colors)], marker='+', s=100)
+
+plt.xlabel('x (nm)')
+plt.ylabel('y (nm)')
+plt.gca().set_aspect('equal')
+plt.legend()
+plt.title('Localizaciones de todas las nubes con elipses de dispersión')
+plt.tight_layout()
+plt.show()
+#%%
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
+
+def plot_ellipse_cov(mean, cov, ax, color='red', alpha=0.3):
+    """Dibuja una elipse usando la covarianza."""
+    vals, vecs = np.linalg.eigh(cov)
+    width, height = 2 * np.sqrt(vals)  # Escala con desviaciones estándar
+    angle = np.degrees(np.arctan2(*vecs[:, 1][::-1]))  # Orientación
+    ell = Ellipse(xy=mean, width=width, height=height, angle=angle,
+                  edgecolor=color, facecolor=color, alpha=alpha)
+    ax.add_patch(ell)
+
+def plot_ellipse_percentile(x, y, ax, color='blue', alpha=0.3):
+    """Dibuja una elipse basada en percentiles del 68%."""
+    mean_x, mean_y = np.mean(x), np.mean(y)
+    perc_x, perc_y = np.percentile(x, [16, 84]), np.percentile(y, [16, 84])
+    width, height = perc_x[1] - perc_x[0], perc_y[1] - perc_y[0]
+    ell = Ellipse(xy=(mean_x, mean_y), width=width, height=height,
+                  edgecolor=color, facecolor=color, alpha=alpha)
+    ax.add_patch(ell)
+
+# Crear la figura
+fig, ax = plt.subplots(figsize=(6, 6))
+colors = ['blue', 'orange', 'green', 'red', 'purple']
+for i, (start, end) in enumerate(nube_ranges):
+    x_nube, y_nube = x_loc[start:end], y_loc[start:end]
+    mean = [np.mean(x_nube), np.mean(y_nube)]
+    cov = np.cov(x_nube, y_nube)
+
+    # Dibujar puntos de la nube
+    ax.scatter(x_nube, y_nube, s=10, alpha=0.3, label=f'Nube {i+1}', color=colors[i])
+
+    # Dibujar elipse basada en covarianza
+    plot_ellipse_cov(mean, cov, ax, color=colors[i])
+
+    # Dibujar elipse basada en percentiles
+    plot_ellipse_percentile(x_nube, y_nube, ax, color='black')
+
+# Ajustes del gráfico
+ax.set_xlabel('x (nm)')
+ax.set_ylabel('y (nm)')
+ax.set_aspect('equal')
+ax.legend()
+plt.title('Comparación de Elipses de Localización')
 plt.show()
