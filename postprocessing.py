@@ -2,34 +2,39 @@ from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+from typing import List
+from scipy.ndimage import gaussian_filter1d
+
 from loc_tools import crb_minflux
 from configvar import (
     NUM_PULSES,
     STEP_NM,
     SIGMA_TOL_OUTLIERS,
+    CENTRAL_DONA_IDX,
+    MAX_DIST_FROMEBP_CENT_NM
 )
 from ebp import EBP
 
 class DataPostProcessor():
-    def __init__(self, locs_filepath: Path, drift_data_filepath: Path, t_start_filepath: Path, ebp: EBP, bin_size: int, use_drift_data_choice: bool):
+    def __init__(self, locs_filepath: Path, drift_filepath_list: List[Path], ebp: EBP, bin_size: int, use_drift_data_choice: bool):
         self.locs_filepath = locs_filepath
-        self.drift_data_filepath = drift_data_filepath
-        self.t_start_filepath = t_start_filepath
+        self.drift_filepath_list = drift_filepath_list
         self.ebp = ebp
         self.bin_size = bin_size
         self.use_drift_data_choice = use_drift_data_choice
         
         # open file containing localization results
         self.locs = self.load_locs(self.locs_filepath)
+        # eliminate spatial outliers from localizations
+        self.locs = self.eliminate_outliers(self.locs)
         if self.use_drift_data_choice:
             # open file with drift data for a posteriori drift correction
-            self.drift_data = self.prepare_drift_data(self.drift_data_filepath)
+            self.drift_data = self.prepare_drift_data(self.drift_filepath_list)
             # correct a posteriori localizations with drift data
             self.locs = self.apost_drift_locs_corr(self.locs, self.drift_data)
-        # eliminate spatial outliers from localizations
-        self.locs_nooutliers = self.eliminate_outliers(self.locs)
+
         # now filter localizations based on photons numbers
-        self.locs_filt = self.filter_locs_forph(self.locs_nooutliers)
+        self.locs_filt = self.filter_locs_forph(self.locs)
         # compute average photon number and SBR based on filtered localizations
         self.avg_ph_perloc, self.avg_sbr = self.get_avg_loc_param(self.locs_filt)
         # compute and plot CRB map, superimposed with EBP
@@ -70,59 +75,62 @@ class DataPostProcessor():
         rv = np.concatenate(data) if data else None
         return rv
         
-    def prepare_drift_data(self, drift_data_filepath):
+    def prepare_drift_data(self, drift_filepath_list):
         """
         This function loads and prepare drift data for a posteriori correction
         """
-        # Load the .npy files into numpy arrays
-        xyvst = self.load_takyaq_data(drift_data_filepath)
-
-        # Extract time data
-        t = xyvst['t']
+        should_fill_t_axis = True
+        with open(drift_filepath_list[0], 'r') as part_coord_file:
+                drift_num_pts = len(part_coord_file.readlines()[1:])
+        t_axis = np.empty(drift_num_pts, dtype=float)
+        allpart_coord_arr = np.empty((len(drift_filepath_list), drift_num_pts, 2), dtype=float)
         
-        # get absolute time of start TCSPC measurement to correct offset
-        with open(self.t_start_filepath) as ff:
-            t_tcspc_start_s = float(ff.read())
-        t_drift_data_start_s = t[0]
+        for particle_idx in range(len(drift_filepath_list)):
+            with open(drift_filepath_list[particle_idx], 'r') as part_coord_file:
+                coords = part_coord_file.readlines()[1:]
+                for coord_idx in range(len(coords)):
+                    if should_fill_t_axis:
+                        t_axis[coord_idx] = coords[coord_idx].split(' ')[0]
+                    allpart_coord_arr[particle_idx, coord_idx, 0] = coords[coord_idx].split(' ')[1]
+                    allpart_coord_arr[particle_idx, coord_idx, 1] = coords[coord_idx].split(' ')[2]
+                should_fill_t_axis = False
+
+        avg_coord_arr = np.mean(allpart_coord_arr, axis=0)
+        avg_coord_arr[:, 0] = gaussian_filter1d(avg_coord_arr[:, 0], sigma=3)
+        avg_coord_arr[:, 1] = gaussian_filter1d(avg_coord_arr[:, 1], sigma=3)
         
-        # set correct offset in time
-        t = t - t[0] - t_tcspc_start_s + t_drift_data_start_s
-
-        # Automatically detect the number of columns in xyvst['xy']
-        n_columns = xyvst['xy'].shape[1]  # Number of columns
-
-        # Initialize lists to store x, y data
-        x_data = []
-        y_data = []
-
-        # Extract x and y columns
-        for i in range(n_columns):
-            x_data.append(xyvst['xy'][:, i][:, 0])  # Extract x_i
-            y_data.append(xyvst['xy'][:, i][:, 1])  # Extract y_i
-
-        # Convert lists to numpy arrays for easier manipulation
-        x_data = np.array(x_data).T  # Transpose to match shape (n_samples, n_columns)
-        y_data = np.array(y_data).T  # Transpose to match shape (n_samples, n_columns)
-
-        # Compute the average of x and y columns
-        x_avg = np.mean(x_data, axis=1)  # Average across columns (axis=1)
-        y_avg = np.mean(y_data, axis=1)  # Average across columns (axis=1)
-
-        return np.stack((t, x_avg, y_avg))
+        for particle_idx in range(len(drift_filepath_list)):
+            plt.plot(t_axis, -allpart_coord_arr[particle_idx, :, 0], linestyle=':')
+        plt.plot(t_axis, -avg_coord_arr[:,0], linestyle='-')
+        plt.show()
+        for particle_idx in range(len(drift_filepath_list)):
+            plt.plot(t_axis, allpart_coord_arr[particle_idx, :, 1], linestyle=':')
+        plt.plot(t_axis, avg_coord_arr[:,1], linestyle='-')
+        plt.show()
+        return np.column_stack((t_axis, avg_coord_arr))
         
     def apost_drift_locs_corr(self, locs, drift_data):
         """
         This function uses the data of the xy drift to correct a posteriori the MINFLUX localizations. For each localization
         it uses the closest (in time) datapoint of the drift
         """
+        plt.plot(drift_data[:,0], -drift_data[:,1] + np.mean(drift_data[:,1]), label='x drift')
+        plt.plot(locs[:,0], locs[:,1] - np.mean(locs[:,1]), label='x pos')
+        plt.legend()
+        plt.show()
+        
+        plt.plot(drift_data[:,0], drift_data[:,2] - np.mean(drift_data[:,2]), label='y drift')
+        plt.plot(locs[:,0], locs[:,2] - np.mean(locs[:,2]), label='x pos')
+        plt.legend()
+        plt.show()
+        
         last_closest_t_idx = 0
         for loc_idx in range(len(locs[:, 0])):
-            for t_drift_idx in range(last_closest_t_idx, len(drift_data[0])):
-                if drift_data[0][t_drift_idx] > locs[loc_idx, 0]:
-                    # to start search from here for next point
-                    last_closest_t_idx = t_drift_idx - 1
-                    locs[loc_idx, 1] -= drift_data[1][t_drift_idx - 1]
-                    locs[loc_idx, 2] -= drift_data[2][t_drift_idx - 1]
+            for t_drift_idx in range(last_closest_t_idx, len(drift_data[:, 0])):
+                if drift_data[t_drift_idx, 0] > locs[loc_idx, 0]:
+                    last_closest_t_idx = t_drift_idx
+                    locs[loc_idx, 1] += drift_data[t_drift_idx, 1]
+                    locs[loc_idx, 2] -= drift_data[t_drift_idx, 2]
                     break
         self.locs_driftcorr_results_filename = self.locs_filepath.stem + '_driftcorr_'  + '.npy'
         self.locs_driftcorr_results_filepath = self.locs_filepath.parent / self.locs_driftcorr_results_filename
@@ -131,8 +139,14 @@ class DataPostProcessor():
         
     def eliminate_outliers(self, locs):
         """
-        This function eliminates all localization exceeding 3 sigma from the center of mass
+        This function eliminates all localization exceeding a certain number of sigma from the center of mass,
+        or too far from the EBP center
         """
+        dists_loc_from_ebp_center = np.sqrt(
+            (locs[:, 1] - self.ebp.pos_mins_nm[CENTRAL_DONA_IDX, 0])**2 + (locs[:, 2] - self.ebp.pos_mins_nm[CENTRAL_DONA_IDX, 1])**2
+        )   
+        locs = locs[dists_loc_from_ebp_center < MAX_DIST_FROMEBP_CENT_NM]
+        
         self.average_coords_locs = (
             np.mean(locs[:, 1]),
             np.mean(locs[:, 2])
@@ -143,9 +157,9 @@ class DataPostProcessor():
         )
         dists_loc_from_center = np.sqrt(
             (locs[:, 1] - self.average_coords_locs[0])**2 + (locs[:, 2] - self.average_coords_locs[1])**2
-        )
-        locs_nooutliers = locs[dists_loc_from_center < SIGMA_TOL_OUTLIERS * np.sqrt(self.average_sigma_locs[0]**2 + self.average_sigma_locs[1]**2)]
-        return locs_nooutliers
+        )  
+        locs = locs[dists_loc_from_center < SIGMA_TOL_OUTLIERS * np.sqrt(self.average_sigma_locs[0]**2 + self.average_sigma_locs[1]**2)]
+        return locs
         
     def filter_locs_forph(self, locs):
         """This function filters out localizations obtained with less photons than a chosen threshold"""
@@ -210,7 +224,7 @@ class DataPostProcessor():
         plt.figure('CRB_map')
         # Shift CRB map by the same amount as the EBP
         plt.imshow(
-            self.σ_CRB, cmap='viridis', vmin=0, vmax=20,
+            self.σ_CRB, cmap='viridis', vmin=0, vmax=5,
             extent=(
                 - self.ebp.pos_mins_nm[0][0] - 0.5, self.σ_CRB.shape[1] - self.ebp.pos_mins_nm[0][0] - 0.5,
                 - self.ebp.pos_mins_nm[0][1] - 0.5, self.σ_CRB.shape[0] - self.ebp.pos_mins_nm[0][1] - 0.5
@@ -273,7 +287,7 @@ class DataPostProcessor():
         plt.figure('CRB_map with loalizations')
         # Shift CRB map by the same amount as the EBP
         plt.imshow(
-            self.σ_CRB, cmap='viridis', vmin=0, vmax=20,
+            self.σ_CRB, cmap='viridis', vmin=0, vmax=5,
             extent=(
                 - self.ebp.pos_mins_nm[0][0] - 0.5, self.σ_CRB.shape[1] - self.ebp.pos_mins_nm[0][0] - 0.5,
                 - self.ebp.pos_mins_nm[0][1] - 0.5, self.σ_CRB.shape[0] - self.ebp.pos_mins_nm[0][1] - 0.5

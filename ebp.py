@@ -9,8 +9,6 @@ from configvar import (
     COLOR_LIST
 )
 
-doughnut_tail = 5
-
 class EBP():
     def __init__(self, psf_dir: Path):
         self.psf_dir = psf_dir
@@ -25,11 +23,12 @@ class EBP():
         """
         psf_fit_list = []
         pos_min_nm_list = []
+        print(self.psf_dir)
         for filepath in natsorted(self.psf_dir.iterdir()):
             if filepath.is_file():
                 if filepath.suffix == '.npy':
+                    print(filepath.name)
                     psf_fit = np.load(filepath)
-                    psf_fit -= doughnut_tail
                     psf_fit_list.append(psf_fit)
                     psf_size = np.shape(psf_fit)[1]
                     self.size_nm = psf_size * STEP_NM

@@ -30,7 +30,8 @@ class SMOrigamiAnalysis():
         # Compute standard deviations (σ) from covariance matrix
         sigmas = np.sqrt(np.array([np.diag(cov) for cov in covariances]))
         print(f"Center: {means[0]}")
-        print(f"Sigma: {sigmas[0]}")
+        print(f"Sigmas: {sigmas[0]}")
+        print(f"Average sigma: {np.sqrt((sigmas[0][0]**2 + sigmas[0][1]**2)/2)}")
         print(f"CRB in cloud center: {self.post_proc_data.σ_CRB[
             int(self.post_proc_data.ebp.pos_mins_nm[0][1] + means[0][1]),
             int(self.post_proc_data.ebp.pos_mins_nm[0][0] + means[0][0])

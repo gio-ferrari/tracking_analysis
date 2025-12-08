@@ -27,7 +27,7 @@ This code still requires adaptation for tracking experiments using Swabian hardw
 
 import numpy as np
 import matplotlib.pyplot as plt
-
+from pathlib import Path
 from natsort import natsorted
 
 from configvar import (
@@ -35,7 +35,13 @@ from configvar import (
     PSF_DIR_BASE,
     DATA_DIR_BASE,
     LOCS_FILE_SUFFIX,
-    PULSES_POS_NS
+    PULSES_POS_NS,
+    TCSPC_SUFFIX,
+    TCSPC_EXT,
+    DRIFT_SUFFIX,
+    DRIFT_EXT,
+    EBP_DIR_SUFFIX,
+    PSF_FIT_DIR_NAME
 )
 from ebp import EBP
 from tcspcdata import TCSPCData
@@ -46,35 +52,45 @@ from origamianalysis import SMOrigamiAnalysis, ClockOrigamiAnalysis
 
 plt.close('all')
 
-date = '20250227'
+date = '20251205'
 
+meas_name = 'tlo_atto647N'
+channel_name = 'red'
+meas_number = 8
+
+ebp_number = 1
+ebp_color = 'r'
+
+if meas_number==0:
+    filename_base = meas_name + '_' + channel_name + '_' + date
+else:
+    filename_base = meas_name + '_' + channel_name + '_' + str(meas_number) + '_' + date
+    
 # TCSPC data file
-# clocks not stabilized
-tcspc_filename = 'clock_G_drift_20250227-165924_.npy'
-# nice clock stabilized
-#tcspc_filename = 'clock_20250214-152357_.npy'
+tcspc_filename = filename_base + '_' + TCSPC_SUFFIX + TCSPC_EXT
 
 # Drift data for a posteriori correction (not always used!)
-drift_data_filename = 'xy_data20250227T16-59-21.npy'
-
-# Absolute time for the start of the TCSPC measurement
-t_start_filename = 'clock_G_drift_20250227-165924_t_start.txt'
+drift_data_filename_base = filename_base + '_' + DRIFT_SUFFIX
 
 # Data for background estimation when there's no bleaching (not always used!)
-bckg_filename = 'bead_bkg_20250220-205458_.npy'
+bckg_filename = 'bckg_atto647N_highpow_red_20251205_arrays.ptu'
 
 # Data for background from dark counts estimation when power is variable during measurement (not always used!)
 bckg_dark_cnts_filename = 'bckg_dark_cnts__20250224-162247_.npy'
 
-psf_dir = PSF_DIR_BASE / date
+psf_dir = PSF_DIR_BASE / Path(date + '_' + EBP_DIR_SUFFIX) / Path(str(ebp_number)) / Path(ebp_color) / PSF_FIT_DIR_NAME
 data_dir = DATA_DIR_BASE / date
 tcspc_file = data_dir / tcspc_filename
-drift_data_filepath = data_dir / drift_data_filename
-t_start_filepath = data_dir / t_start_filename
 bckg_file = data_dir / bckg_filename
 bckg_file_dark_cnts_file = DIR_BASE / bckg_dark_cnts_filename
 timetrace_bin_width_s = 0.1
-target_n_ph = 1700
+target_n_ph = 1000
+
+drift_filepath_list = []
+for drift_filepath in natsorted(data_dir.iterdir()):
+    if drift_filepath.is_file():
+        if drift_data_filename_base in drift_filepath.name:
+            drift_filepath_list.append(drift_filepath)
 
 if __name__ == "__main__":
     # Open fitted experimental PSFs
@@ -107,7 +123,7 @@ if __name__ == "__main__":
         use_drift_data_choice = True
     else:
         use_drift_data_choice = False
-    postproc = DataPostProcessor(locs_filepath_list[result_filenumber_chosen], drift_data_filepath, t_start_filepath, ebp, locs_dens_hist_bin_size, use_drift_data_choice)
+    postproc = DataPostProcessor(locs_filepath_list[result_filenumber_chosen], drift_filepath_list, ebp, locs_dens_hist_bin_size, use_drift_data_choice)
     sm_analysis_choice = input("Do you want to perform the analysis for the SM origami? (y/n) ")
     if sm_analysis_choice == 'y':
         sm_analysis = SMOrigamiAnalysis(postproc, locs_filepath_list[result_filenumber_chosen], data_dir)

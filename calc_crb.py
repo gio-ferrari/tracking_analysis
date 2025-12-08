@@ -47,7 +47,7 @@ print(f"Computing CRB with {ph_perloc} photons and {sbr} of SBR")
 plt.figure('CRB_map')
 # Shift CRB map by the same amount as the EBP
 plt.imshow(
-    σ_CRB, cmap='viridis', vmin=0, vmax=20,
+    σ_CRB, cmap='viridis', vmin=0, vmax=5,
     extent=(
         - pos_min_nm_arr[0][0] - 0.5, σ_CRB.shape[1] - pos_min_nm_arr[0][0] - 0.5,
         - pos_min_nm_arr[0][1] - 0.5, σ_CRB.shape[0] - pos_min_nm_arr[0][1] - 0.5
