@@ -52,13 +52,13 @@ from origamianalysis import SMOrigamiAnalysis, ClockOrigamiAnalysis
 
 plt.close('all')
 
-date = '20251205'
+date = '20251217'
 
-meas_name = 'tlo_atto647N'
+meas_name = 'nc_sixsites_atto643'
 channel_name = 'red'
-meas_number = 8
+meas_number = 5
 
-ebp_number = 1
+ebp_number = 2
 ebp_color = 'r'
 
 if meas_number==0:
@@ -73,7 +73,7 @@ tcspc_filename = filename_base + '_' + TCSPC_SUFFIX + TCSPC_EXT
 drift_data_filename_base = filename_base + '_' + DRIFT_SUFFIX
 
 # Data for background estimation when there's no bleaching (not always used!)
-bckg_filename = 'bckg_atto647N_highpow_red_20251205_arrays.ptu'
+bckg_filename = 'bckg_sixsites_red_20251217_arrays.ptu'
 
 # Data for background from dark counts estimation when power is variable during measurement (not always used!)
 bckg_dark_cnts_filename = 'bckg_dark_cnts__20250224-162247_.npy'

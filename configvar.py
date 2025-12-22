@@ -13,7 +13,7 @@ DATA_DIR_BASE = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\Data_PyFLUX")
 LOCS_FILE_SUFFIX = "_locs_"
 SIGMA_TOL_OUTLIERS = 3
 COLOR_LIST = ['blue', 'orange', 'gray', 'yellow']
-PULSES_POS_NS = np.array([1.5, 14.3, 26.6 , 39.2])  # [ns] 
+PULSES_POS_NS = np.array([1.0, 13.8, 26.3 , 38.9])  # [ns] 
 CENTRAL_DONA_IDX = 3
 MAX_DIST_FROMEBP_CENT_NM = 800
 
