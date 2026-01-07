@@ -5,6 +5,10 @@ description = ""
 authors = ["gio-ferrari <giovanni.ferrari.fe@gmail.com>"]
 readme = "README.md"
 
+packages = [
+    { include = "tracking_analysis", from = "src" }
+]
+
 [tool.poetry.dependencies]
 python = "^3.12"
 numpy = "<2.4"
@@ -15,6 +19,7 @@ pytest = "^9.0.2"
 scikit-learn = "^1.8.0"
 hmmlearn = "^0.3.3"
 numba = "^0.63.1"
+rocket-fft = ">=0.2.4,<0.3"
 
 
 [build-system]

@@ -3,8 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from natsort import natsorted
 from pathlib import Path
-from loc_tools import indexToSpace
-from configvar import (
+
+from tracking_analysis.tools.loc_tools import indexToSpace
+from tracking_analysis.config.configvar import (
     STEP_NM,
     COLOR_LIST
 )

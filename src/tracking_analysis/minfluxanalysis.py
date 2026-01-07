@@ -1,14 +1,14 @@
 from copy import deepcopy
 import numpy as np
 
-from loc_tools import loc_trace_minflux
-from configvar import (
+from tools.loc_tools import loc_trace_minflux
+from config.configvar import (
     NUM_PULSES,
     STEP_NM,
     LOCS_FILE_SUFFIX,
 )
-from ebp import EBP
-from tcspcdata import TCSPCData
+from tracking_analysis.ebp import EBP
+from tracking_analysis.tcspcdata import TCSPCData
 
 class MINFLUXAnalysis():
     def __init__(self, ebp: EBP, tcspc_data: TCSPCData, target_n_ph: int):

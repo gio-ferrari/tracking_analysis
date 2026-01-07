@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import List
 from scipy.ndimage import gaussian_filter1d
 
-from loc_tools import crb_minflux
-from configvar import (
+from tracking_analysis.tools.loc_tools import crb_minflux
+from tracking_analysis.config.configvar import (
     NUM_PULSES,
     STEP_NM,
     SIGMA_TOL_OUTLIERS,

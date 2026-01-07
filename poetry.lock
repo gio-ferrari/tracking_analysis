@@ -808,6 +808,47 @@ files = [
 six = ">=1.5"
 
 [[package]]
+name = "rocket-fft"
+version = "0.2.5"
+description = "Rocket-FFT extends Numba by scipy.fft and numpy.fft"
+optional = false
+python-versions = "*"
+files = [
+    {file = "rocket-fft-0.2.5.tar.gz", hash = "sha256:9c8ab3fbfaf322344d6de83315bb73626b8467b5aa93ef26aadc3346c2630a28"},
+    {file = "rocket_fft-0.2.5-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:b752e2b0337afe138f1bf0cd46c4d391964c480aeaf42ddf97366d68b8e5e412"},
+    {file = "rocket_fft-0.2.5-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:ee839203b95010bf62f09d77cd722025a16596de5da4d87b44f650238d5ab0d2"},
+    {file = "rocket_fft-0.2.5-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:dfdb1abd653e2ef831fec8d73fc4996b9ae8a22f2ef9054a100814ad4fe08462"},
+    {file = "rocket_fft-0.2.5-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1c2c90a47ead16a00751d232aacf0ddcb66e37222770aab9e90b5551d6c3a39e"},
+    {file = "rocket_fft-0.2.5-cp310-cp310-win_amd64.whl", hash = "sha256:dada3fab0ef686a31ff627f2e28635feb8d2ccc198dc14259673e413a6d0d2da"},
+    {file = "rocket_fft-0.2.5-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:61f3e0ab86409638348cdcb0c7ec3c81d6c1358c67ee5ff34959accad38289f7"},
+    {file = "rocket_fft-0.2.5-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:e28a8a381c785b528ef23d96139aeefffc9f549d5edb13a9fbddd7a62c636f8a"},
+    {file = "rocket_fft-0.2.5-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7db08c74814462c50375dc890ad884ad97100ccc243da02f45b1ea9592b3fa11"},
+    {file = "rocket_fft-0.2.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3c343b9cd17ce9da60022256aabfb39588628de150210250e3f7c75adca369dd"},
+    {file = "rocket_fft-0.2.5-cp311-cp311-win_amd64.whl", hash = "sha256:7c2300964ab8aa69a77c42a2495d26c2e19b0a601a26c5565e4cbaeda980625c"},
+    {file = "rocket_fft-0.2.5-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:c76f189535e2cda8970a4679966ac320f7486071f0a59a8f13b48884c44325a0"},
+    {file = "rocket_fft-0.2.5-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:7b63e6e8e7b925e9a8cce75bf30559c6507fe7ce92156acbe42d5481ada81d1c"},
+    {file = "rocket_fft-0.2.5-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b38877592f7704fc328d47103e7cf4fdca24f59e2b1c97b3e773c6e60580af4a"},
+    {file = "rocket_fft-0.2.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:beaf5a064af017f940d24a0b9a94cb4696c8722fda9c1726fea645a41344ea6e"},
+    {file = "rocket_fft-0.2.5-cp312-cp312-win_amd64.whl", hash = "sha256:d8a6b6b0ad5b7769aab9b37cad2f17f14f778bff205ba46aee6e71ca1f273662"},
+    {file = "rocket_fft-0.2.5-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:d9eddb716b8601d6728c621c94b1a5f1ab8053763e9010e684320d3bef9361b4"},
+    {file = "rocket_fft-0.2.5-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:19c4f11f3fa3f0acb2f81d7c5f16c1077998ce04ad1c9a069e0b6877906cd8d6"},
+    {file = "rocket_fft-0.2.5-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:63a19be485d95d3497c32913d87328d5427ffdb78f871398bb060f632346548c"},
+    {file = "rocket_fft-0.2.5-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cc2c62bc5943795cae010d61efe7b2383c00814e7f0f8e0678ffb515756bbb4b"},
+    {file = "rocket_fft-0.2.5-cp38-cp38-win_amd64.whl", hash = "sha256:6dd1f1a04b56f258d7f34d6d1bb9815be5c563400a81609c997e10ea77e466a1"},
+    {file = "rocket_fft-0.2.5-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:ae4ed289f68fb9d30386b427d0d886b6bcacd6831340b693e72ee098b72864c6"},
+    {file = "rocket_fft-0.2.5-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:0c51219c3cb38fa7c9ff8641642ac8a5de22f9fa033252bbc2ea557bf34e9637"},
+    {file = "rocket_fft-0.2.5-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:27848e7e74c84dd9eae3a683260dbf060fde56714a1112438f84cbd310847444"},
+    {file = "rocket_fft-0.2.5-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:989739a8bb4432b7f4059c19bdede7fde98c76cb70fa62d7a299a8606be5619c"},
+    {file = "rocket_fft-0.2.5-cp39-cp39-win_amd64.whl", hash = "sha256:c9a674a7434cbb2d11691d1ad9cbae24ff8d7db10a70cc60004efc5308410360"},
+]
+
+[package.dependencies]
+numba = ">=0.56.0"
+
+[package.extras]
+dev = ["pytest (>=6.2.5)", "scipy (>=1.7.2)", "setuptools (>=59.2.0)"]
+
+[[package]]
 name = "scikit-learn"
 version = "1.8.0"
 description = "A set of python modules for machine learning and data mining"
@@ -971,4 +1012,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "13da216e80b17e20b30736f92a15dc832058a37e38b3f12da5f4b4e9acacd775"
+content-hash = "9eca502f8f93d94e15cd16d653f4d40bc59f78790d26f9db1edf578ead94b3fd"

@@ -3,8 +3,8 @@ import copy
 from natsort import natsorted
 import matplotlib.pyplot as plt
 
-from loc_tools import indexToSpace, crb_minflux
-from configvar import (
+from tracking_analysis.tools.loc_tools import indexToSpace, crb_minflux
+from tracking_analysis.config.configvar import (
     NUM_PULSES,
     STEP_NM,
     PSF_DIR_BASE,

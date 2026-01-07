@@ -2,7 +2,8 @@ import numpy as np
 import numba as nb
 from numba import types, typed
 from typing import Union, List
-from configvar import NUM_PULSES
+
+from tracking_analysis.config.configvar import NUM_PULSES
 
 def indexToSpace(index, size_nm, px_nm):
     space = np.zeros(2)
