@@ -75,6 +75,14 @@ def get_two_smallest_uniq(inp_arr: npt.NDArray[np.float64]) -> npt.NDArray[np.fl
             break
     return np.array([lowest_val, sec_val])
 
+@_njit("f8(f8[:], f8[:])")
+def calc_cost(model_fn_eval: npt.NDArray[np.float64], normed_cnts: npt.NDArray[np.float64]) -> np.float64:
+    res = 0.0
+    for i in range(len(normed_cnts)):
+        if normed_cnts[i] != 0:
+            res -= normed_cnts[i] * (np.log(model_fn_eval[i]) - np.log(normed_cnts[i]))
+    res *= 2.0
+    return res
 
 @_njit("f8[:](f8[:], f8[:])")
 def rtfft_convolve(
@@ -149,115 +157,12 @@ def modulated_half_lorentz(
     # print(result)
     return result
 
-
-# @njit(
-#     "intp(float64[:], float64)",
-#     nogil=True,
-#     cache=True,
-#     inline="always",
-#     fastmath=True,
-# )
-# def calc_closest_idx_after_shift(t: npt.NDArray[np.float64], shift: float) -> np.intp:
-#     # np.searchsorted HAS TO WRAPPED WITH NUMBA (μs -> ns speed up in benchmark!!!!)
-#     return np.searchsorted(t, shift, side="right")
-
-
 @_njit("f8(f8[:], intp, f8)")
 def calc_delta_t(t: npt.NDArray[np.float64], closest_idx: np.intp, shift: float) -> float:
     if np.round(t[closest_idx], 8) == np.round(shift, 8):
         return 0.0
     else:
         return shift - t[closest_idx]  # negative val! -> intended
-
-
-# @njit(
-#     "float64(float64, float64, float64)",
-#     nogil=True,
-#     cache=True,
-#     inline="always",
-#     fastmath=True,
-# )
-# def calc_norm_const(total_time: float, shift: float, oo_tau: float) -> float:
-#     return 1.0 / (-np.expm1(-(total_time - shift) * oo_tau))
-
-
-@_njit("f8[:](f8[:], f8[:], f8, f8, f8, f8, u4)")
-def nb_trunc_shift_exp_conv_eval(
-    x: npt.NDArray[np.float64],
-    norm_irf: npt.NDArray[np.float64],
-    tau: float,
-    shift: float,
-    c_bg: float,
-    bin_sz_ns: float,
-    no_phot: np.uint64,
-) -> npt.NDArray[np.float64]:
-    oo_tau = 1.0 / tau  # reduce no. of divisions
-
-    closest_idx = np.searchsorted(x, shift, side="right")
-    # calc_closest_idx_after_shift(x, shift)
-    delta_t = calc_delta_t(x, closest_idx, shift)
-
-    exp_eval = cust_trunc_expon(x, oo_tau, shift, closest_idx)
-    conv_exp = -np.expm1(-bin_sz_ns * oo_tau) * rtfft_convolve(exp_eval, norm_irf) + c_bg
-
-    # compute correction
-    corr_const_fac = -np.expm1(delta_t * oo_tau) if delta_t != 0.0 else 0.0
-    corr_const = corr_const_fac * norm_irf
-    end_idx = np.minimum(closest_idx + norm_irf.size, x.size)
-    slice_len = end_idx - closest_idx
-
-    # add correction to the convolution
-    for i in range(0, slice_len):
-        conv_exp[i + closest_idx - 1] += corr_const[i]
-
-    sum_conv_exp = np.sum(conv_exp)
-    # Protect against zero-division error
-    if np.round(sum_conv_exp, 8) == np.round(0.0, 8):
-        return conv_exp
-    else:
-        inv_norm_fac = 1.0 / np.sum(conv_exp)
-        return no_phot * inv_norm_fac * conv_exp
-
-
-@_njit("f8[:](f8[:], f8[:], c16[:], f8, f8, f8, f8, u4)")
-def nb_trunc_shift_exp_conv_eval_v2(
-    x: npt.NDArray[np.float64],
-    norm_irf_rs: npt.NDArray[np.float64],  # rs = real space
-    norm_irf_fs: npt.NDArray[np.complex128],  # fs = fourier space
-    tau: float,
-    shift: float,
-    c_bg: float,
-    bin_sz_ns: float,
-    no_phot: np.uint32,
-) -> npt.NDArray[np.float64]:
-    oo_tau = 1.0 / tau  # reduce no. of divisions
-    # print('using half FS version')
-    closest_idx = np.searchsorted(x, shift, side="right")
-    # calc_closest_idx_after_shift(x, shift)
-    delta_t = calc_delta_t(x, closest_idx, shift)
-
-    exp_eval = cust_trunc_expon(x, oo_tau, shift, closest_idx)
-    conv_exp = -np.expm1(-bin_sz_ns * oo_tau) * half_transform_convolve(norm_irf_fs, exp_eval) + c_bg
-
-    # compute correction
-    corr_const_fac = -np.expm1(delta_t * oo_tau) if delta_t != 0.0 else 0.0
-    corr_const = corr_const_fac * norm_irf_rs
-    end_idx = np.minimum(closest_idx + norm_irf_rs.size, x.size)
-    slice_len = end_idx - closest_idx
-
-    # add correction to the convolution
-    for i in range(0, slice_len):
-        conv_exp[i + closest_idx - 1] += corr_const[i]
-
-    sum_conv_exp = np.sum(conv_exp)
-    # Protect against zero-division error
-    if np.round(sum_conv_exp, 8) == np.round(0.0, 8):
-        return conv_exp
-    else:
-        inv_norm_fac = 1.0 / np.sum(conv_exp)
-        # return no_phot * inv_norm_fac * conv_exp
-        # MRJD test:
-        return inv_norm_fac * conv_exp
 
 @_njit("f8[:](f8[:], i8)")
 def pad_right_withzero(
@@ -272,7 +177,7 @@ def pad_right_withzero(
         return arr_padded
 
 @_njit("f8[:](f8[:], f8[:], c16[:], f8, i8, f8, f8, i8, i8, i8, c16[:], c16[:])")
-def nb_trunc_shift_exp_conv_eval_fullfs(
+def nb_trunc_shift_exp_conv_eval_fullfs_wobg(
     x: npt.NDArray[np.float64],
     norm_irf_rs: npt.NDArray[np.float64],  # rs = real space
     norm_irf_fs: npt.NDArray[np.complex128],  # fs = fourier space
@@ -325,9 +230,8 @@ def nb_trunc_shift_exp_conv_eval_fullfs(
         # MRJD test:
         return inv_norm_fac * conv_exp
 
-
 @_njit("f8[:](f8[:], f8[:], c16[:], f8, f8, f8, i8, f8, f8, f8, i8, i8, i8, c16[:], c16[:])")
-def nb_trunc_shift_biexp_conv_eval_fullFS(
+def nb_trunc_shift_biexp_conv_eval_fullfs(
     x: npt.NDArray[np.float64],
     norm_irf_rs: npt.NDArray[np.float64],  # rs = real space
     norm_irf_fs: npt.NDArray[np.complex128],  # fs = fourier space
@@ -433,3 +337,57 @@ def nb_norm_fit(
     exp_eval = norm_const * np.exp(-x * oo_tau)
     inv_fac = 1.0 / (1.0 + c_bg * n_bins)
     return n_phot * (rtfft_convolve(exp_eval, irf_normed_vals) + c_bg) * inv_fac
+
+@_njit("c16[:](i8, i8)")
+def calc_exp_coeff(rs_len_opt: np.int64,
+                    fs_len: np.int64):
+    '''
+    This function computes, at the object creation, the vector of exponentials used later on
+    to compute the modulated Lorentzian in Fourier space
+    '''
+    const_fourier_pref = 2 * np.pi * 1.0j / float(rs_len_opt)
+    exp_coeff = np.empty(fs_len, dtype=np.complex128)
+    for i in range(fs_len):
+        exp_coeff[i] = np.exp(-const_fourier_pref * i)
+    return exp_coeff
+
+@_njit("c16[:](i8, i8)")
+def calc_exp_coeff_inv(rs_len_opt: np.int64,
+                        fs_len: np.int64):
+    '''
+    This function computes, at the object creation, the vector of inverse exponentials used later on
+    to compute the modulated Lorentzian in Fourier space
+    '''
+    const_fourier_pref = 2 * np.pi * 1.0j / float(rs_len_opt)
+    exp_coeff_inv = np.empty(fs_len, dtype=np.complex128)
+    for i in range(fs_len):
+        exp_coeff_inv[i] = np.exp(const_fourier_pref * i)
+    return exp_coeff_inv
+
+@_njit("c16[:](i8, i8, i8, i8, c16[:], c16[:], c16[:])")
+def update_exp_coeff(closest_idx: np.int64,
+                        last_closest_idx: np.int64,
+                        rs_len: np.int64,
+                        fs_len: np.int64,
+                        exp_coeff: npt.NDArray[np.complex128],
+                        exp_coeff_inv: npt.NDArray[np.complex128],
+                        exp_coeff_last_closest_idx: npt.NDArray[np.complex128],):
+    '''
+    This function updates the vector of exponentials elevated to the closest_idx power
+    '''
+    const_fourier_pref = 2 * np.pi * 1.0j / float(rs_len)
+    closest_idx_diff = closest_idx - last_closest_idx
+    #print('necessary update, difference:', closest_idx_diff)
+    if ((closest_idx_diff > 0) and (closest_idx_diff < 21)):
+        for i in range(fs_len):
+            exp_coeff_last_closest_idx[i] = (exp_coeff_last_closest_idx[i] *
+                                                exp_coeff[i]**closest_idx_diff)
+    elif ((closest_idx_diff < 0) and (closest_idx_diff > -21)):
+        for i in range(fs_len):
+            exp_coeff_last_closest_idx[i] = (exp_coeff_last_closest_idx[i] *
+                                                exp_coeff_inv[i]**(-closest_idx_diff))
+    else:
+        const_fourier_pref = 2 * np.pi * 1.0j / float(rs_len)
+        for i in range(fs_len):
+            exp_coeff_last_closest_idx[i] = np.exp(-closest_idx * const_fourier_pref * i)
+    return exp_coeff_last_closest_idx

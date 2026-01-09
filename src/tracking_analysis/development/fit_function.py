@@ -10,13 +10,14 @@ from iminuit import Minuit
 from tracking_analysis.tools.ptu_tools import load_tcspc_data
 from tracking_analysis.tools.pqreader_multiharp import load_ptu
 from tracking_analysis.config.configvar import NUM_PULSES, LASER_PERIOD_NS, PULSES_POS_NS, TCSPC_NANOT_RES_PS, IRF_WIN_END_NS, LIFETIME_WIN_END_NS, OFFSET_FORNANOT_HIST_NS
-from tracking_analysis.numba_func import nb_trunc_shift_exp_conv_eval_fullfs_wobg, calc_delta_t, calc_cost, calc_exp_coeff, calc_exp_coeff_inv, update_exp_coeff
+from tracking_analysis.numba_func import _njit, nb_trunc_shift_exp_conv_eval_fullfs_wobg, calc_delta_t, calc_cost
+from tracking_analysis.tools.trunc_shift_cont_conv_mono_fs import Cost_TruncShiftContConvMonoExpFS
 
 irf_file = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\IRFs\red\IRF_red_20251217_60kHz1.ptu")
 data_file = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\Data_PyFLUX\20251217\nc_sixsites_atto643_red_14_20251217_arrays.ptu")
 bckg_file = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\Data_PyFLUX\20251217\bckg_sixsites_red_20251217_arrays.ptu")
 
-class LifetimeFit():
+class BasicFit():
     def __init__(self, irf_file: Path, data_file: Path, bckg_file: Path):
         self.irf_file = irf_file
         self.data_file = data_file
@@ -43,13 +44,8 @@ class LifetimeFit():
         self.bckg_hist = np.histogram(self.bckg_raw[1], bins = self.nanot_ax_len, range=(0 + OFFSET_FORNANOT_HIST_NS, LASER_PERIOD_NS + OFFSET_FORNANOT_HIST_NS))[0]
         self.n_bckg_ph = np.sum(self.bckg_hist)
         
-        self.exp_n_bckg_ph = self.n_bckg_ph/self.tot_t_meas_bckg_s*self.tot_t_meas_data_s
-        self.signal_contr = (self.n_ph - self.exp_n_bckg_ph)/self.n_ph
-        self.bckg_contr = self.exp_n_bckg_ph/self.n_ph
-        
         # get smoothed background histogram
         self.bckg_smooth_hist = gaussian_filter1d(self.bckg_hist, sigma=5)
-        self.bckg_smooth_norm_hist = self.bckg_smooth_hist / np.sum(self.bckg_smooth_hist)
         
         # get unnormed, normed and normed fourier transformed histogram of irf pulses (separately!)
         self.irf_pulses_hist = self.get_irf_hists(self.irf_raw[2])
@@ -58,11 +54,77 @@ class LifetimeFit():
         self.fs_len = len(self.irf_pulses_hist_norm_ft[0])
         
         self.last_closest_idx = 0
-        self.exp_coeff = calc_exp_coeff(self.nanot_ax_len_opt, self.fs_len)
-        self.exp_coeff_inv = calc_exp_coeff_inv(self.nanot_ax_len_opt, self.fs_len)
+        self.exp_coeff = self._calc_exp_coeff(self.nanot_ax_len_opt, self.fs_len)
+        self.exp_coeff_inv = self._calc_exp_coeff_inv(self.nanot_ax_len_opt, self.fs_len)
         self.exp_coeff_closest_idx = np.ones(self.fs_len, dtype=np.complex128)
         
+        self.cost_fn = Cost_TruncShiftContConvMonoExpFS(
+            self.nanot_ax_ns,
+            self.irf_pulses_hist_norm,
+            self.irf_pulses_hist_norm_ft,
+            self.data_hist_nt,
+            TCSPC_NANOT_RES_PS*1e-3,
+            self.n_ph
+        )
+        
         self.plot_hists()
+    
+    @staticmethod
+    @_njit("c16[:](i8, i8)")
+    def _calc_exp_coeff(rs_len_opt: np.int64,
+                        fs_len: np.int64):
+        '''
+        This function computes, at the object creation, the vector of exponentials used later on
+        to compute the modulated Lorentzian in Fourier space
+        '''
+        const_fourier_pref = 2 * np.pi * 1.0j / float(rs_len_opt)
+        exp_coeff = np.empty(fs_len, dtype=np.complex128)
+        for i in range(fs_len):
+            exp_coeff[i] = np.exp(-const_fourier_pref * i)
+        return exp_coeff
+    
+    @staticmethod
+    @_njit("c16[:](i8, i8)")
+    def _calc_exp_coeff_inv(rs_len_opt: np.int64,
+                            fs_len: np.int64):
+        '''
+        This function computes, at the object creation, the vector of inverse exponentials used later on
+        to compute the modulated Lorentzian in Fourier space
+        '''
+        const_fourier_pref = 2 * np.pi * 1.0j / float(rs_len_opt)
+        exp_coeff_inv = np.empty(fs_len, dtype=np.complex128)
+        for i in range(fs_len):
+            exp_coeff_inv[i] = np.exp(const_fourier_pref * i)
+        return exp_coeff_inv
+    
+    @staticmethod
+    @_njit("c16[:](i8, i8, i8, i8, c16[:], c16[:], c16[:])")
+    def _update_exp_coeff(closest_idx: np.int64,
+                          last_closest_idx: np.int64,
+                          rs_len: np.int64,
+                          fs_len: np.int64,
+                          exp_coeff: npt.NDArray[np.complex128],
+                          exp_coeff_inv: npt.NDArray[np.complex128],
+                          exp_coeff_last_closest_idx: npt.NDArray[np.complex128],):
+        '''
+        This function updates the vector of exponentials elevated to the closest_idx power
+        '''
+        const_fourier_pref = 2 * np.pi * 1.0j / float(rs_len)
+        closest_idx_diff = closest_idx - last_closest_idx
+        #print('necessary update, difference:', closest_idx_diff)
+        if ((closest_idx_diff > 0) and (closest_idx_diff < 21)):
+            for i in range(fs_len):
+                exp_coeff_last_closest_idx[i] = (exp_coeff_last_closest_idx[i] *
+                                                 exp_coeff[i]**closest_idx_diff)
+        elif ((closest_idx_diff < 0) and (closest_idx_diff > -21)):
+            for i in range(fs_len):
+                exp_coeff_last_closest_idx[i] = (exp_coeff_last_closest_idx[i] *
+                                                 exp_coeff_inv[i]**(-closest_idx_diff))
+        else:
+            const_fourier_pref = 2 * np.pi * 1.0j / float(rs_len)
+            for i in range(fs_len):
+                exp_coeff_last_closest_idx[i] = np.exp(-closest_idx * const_fourier_pref * i)
+        return exp_coeff_last_closest_idx
     
     def get_irf_hists(self, irf_raw_nt):
         irf_pulses_hists = []
@@ -72,17 +134,18 @@ class LifetimeFit():
         return irf_pulses_hists
         
     def plot_hists(self):
-        #for pulse_idx in range(NUM_PULSES):
-        #    plt.plot(self.nanot_ax_ns, self.irf_pulses_hist[pulse_idx], alpha=0.5)
+        for pulse_idx in range(NUM_PULSES):
+            plt.plot(self.nanot_ax_ns, self.irf_pulses_hist[pulse_idx], alpha=0.5)
         plt.plot(self.nanot_ax_ns, self.data_hist_nt, alpha=0.5)
         self.guess_dict = self.calc_guess()
-        
-        _, results_dict, _ = self.eval_minuit_fit_monoexp(self.guess_dict)
-        
-        print(results_dict)
-        fitting_fn = self.calc_monoexp(results_dict['tau'], results_dict['shift'], results_dict['a1'], results_dict['a2'], results_dict['a3'])*self.n_ph
-        plt.plot(self.nanot_ax_ns, fitting_fn, color='black')
-        plt.yscale('log')
+        example_conv_data = self.example_conv(
+            self.guess_dict['tau'],
+            self.guess_dict['shift'],
+            self.guess_dict['a1'],
+            self.guess_dict['a2'],
+            self.guess_dict['a3'],
+        )
+        plt.plot(self.nanot_ax_ns, example_conv_data, color='black')
         plt.show()
         
     def calc_guess(self):
@@ -107,7 +170,7 @@ class LifetimeFit():
             irf_max_pos_ns = np.argmax(self.irf_pulses_hist[pulse_idx])*TCSPC_NANOT_RES_PS*1e-3
             
             # get the shift guess from their difference
-            shift_guess_arr[pulse_idx] = data_max_pos_ns - irf_max_pos_ns
+            shift_guess_arr[pulse_idx] = 0#data_max_pos_ns - irf_max_pos_ns
             
             # now get the lifetime guess
             tau_guess_arr[pulse_idx] = np.sum(timegated_ax*timegated_data)/n_ph_guess_arr[pulse_idx] - irf_max_pos_ns
@@ -121,24 +184,24 @@ class LifetimeFit():
         }
         return guess_dict
         
-    def calc_monoexp(self, tau: np.float64, shift: np.float64, a1: np.float64, a2: np.float64, a3: np.float64) -> np.float64:
-        fitting_fn = np.zeros(self.nanot_ax_len)
-        weights = [a1, a2, a3, 1 - (a1 + a2 + a3)]
+    def example_conv(self, tau, shift, a1, a2, a3):
+        convoluted_data = np.zeros(self.nanot_ax_len)
+        
         closest_idx = self.nanot_ax_ns.searchsorted(shift, side="right")
         delta_t = calc_delta_t(self.nanot_ax_ns, closest_idx, shift)
         
-        if closest_idx != self.last_closest_idx:
-            self.exp_coeff_last_closest_idx = update_exp_coeff(closest_idx,
-                                                                     self.last_closest_idx,
-                                                                     self.nanot_ax_len_opt,
-                                                                     self.fs_len,
-                                                                     self.exp_coeff,
-                                                                     self.exp_coeff_inv,
-                                                                     self.exp_coeff_closest_idx,)
-            self.last_closest_idx = closest_idx
+        self.exp_coeff_last_closest_idx = self._update_exp_coeff(closest_idx,
+                                                            self.last_closest_idx,
+                                                            self.nanot_ax_len_opt,
+                                                            self.fs_len,
+                                                            self.exp_coeff,
+                                                            self.exp_coeff_inv,
+                                                            self.exp_coeff_closest_idx,)
+        
+        weights = [a1, a2, a3, 1 - (a1 + a2 + a3)]
         
         for pulse_idx in range(NUM_PULSES):
-            fitting_fn += weights[pulse_idx]*nb_trunc_shift_exp_conv_eval_fullfs_wobg(
+            convoluted_data += weights[pulse_idx]*nb_trunc_shift_exp_conv_eval_fullfs_wobg(
                 self.nanot_ax_ns,
                 self.irf_pulses_hist_norm[pulse_idx],  # rs = real space
                 self.irf_pulses_hist_norm_ft[pulse_idx],  # fs = fourier space
@@ -152,32 +215,10 @@ class LifetimeFit():
                 self.exp_coeff,
                 self.exp_coeff_closest_idx,
             )
-        fitting_fn *= self.signal_contr
-        fitting_fn += self.bckg_smooth_norm_hist*self.bckg_contr
-        return fitting_fn
-    
-    def calc_cost_monoexp(self, tau: np.float64, shift: np.float64, a1: np.float64, a2: np.float64, a3: np.float64) -> np.float64:
-        """
-        Function to be called from Minuit for minimization
-        -> has to follow the cost_fn_spec: fn(arg1, arg2, ...)
-        """
-        fitting_fn = self.calc_monoexp(tau, shift, a1, a2, a3)
-        res = calc_cost(fitting_fn, self.data_hist_normed_nt)
-        return res
+        convoluted_data *= self.n_ph - self.n_bckg_ph/self.tot_t_meas_bckg_s*self.tot_t_meas_data_s
+        convoluted_data += self.bckg_smooth_hist/self.tot_t_meas_bckg_s*self.tot_t_meas_data_s
+        return convoluted_data
         
-    def eval_minuit_fit_monoexp(
-        self,
-        fit_params_w_guess: dict[str, float]
-    ) -> tuple[float | None, dict[str, float], bool]:
-        """
-        Run the fit with Minuit
-        """
-        minuit = Minuit(self.calc_cost_monoexp, grad=None, **fit_params_w_guess)
-        minuit.errordef = Minuit.LIKELIHOOD
-        minuit.migrad()
-
-        return minuit.fval, minuit.values.to_dict(), minuit.valid
-        
-basicfit = LifetimeFit(irf_file, data_file, bckg_file)
+basicfit = BasicFit(irf_file, data_file, bckg_file)
 
         
