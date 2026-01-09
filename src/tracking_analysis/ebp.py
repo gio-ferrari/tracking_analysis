@@ -15,7 +15,7 @@ class EBP():
         self.psf_dir = psf_dir
         self.psf_colors = COLOR_LIST
         self.psf_fits, self.pos_mins_nm, self.pos_mins_centered_nm = self.open_psf()
-        self.plot_psf()
+        #self.plot_psf()
 
     def open_psf(self):
         """

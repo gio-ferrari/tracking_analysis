@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from config.configvar import (
+from tracking_analysis.config.configvar import (
     TCSPC_TIME_OFFSET_NS,
     LASER_PERIOD_NS,
     NUM_PULSES,
@@ -38,7 +38,8 @@ class TCSPCData():
             self.tot_t_measuring_bckg_dark_cnts_s = (self.bckg_dark_cnts_abs_time_s.max() - self.bckg_dark_cnts_abs_time_s.min())
         # process and show data
         self.filter_time_data()
-        self.shift_and_plot_tcspc_data()
+        self.shift_tcspc_data()
+        #self.plot_tcspc_data()
         self.prep_ph_foranalysis()
 
     def plot_timetrace(self):
@@ -64,7 +65,8 @@ class TCSPCData():
             self.is_single_mol = True
         else:
             self.is_single_mol = False
-        use_dark_cnts_choice_input = input("Do you want to use a dark counts measurement? (y/n) ")
+        #use_dark_cnts_choice_input = input("Do you want to use a dark counts measurement? (y/n) ")
+        use_dark_cnts_choice_input = 'n'
         if use_dark_cnts_choice_input == 'y':
             self.use_dark_cnts_choice = True
         else:
@@ -152,7 +154,7 @@ class TCSPCData():
         print(f"Average SBR: {self.avg_sbr_notimegating}")
         print("*****************************")
         
-    def shift_and_plot_tcspc_data(self):
+    def shift_tcspc_data(self):
         """
         This function plots the decay curves of the TCSPC data, and the time windows used for analysis.
         """
@@ -163,6 +165,7 @@ class TCSPCData():
         if self.use_dark_cnts_choice:
             self.bckg_dark_cnts_rel_time_shift_ns = (self.bckg_dark_cnts_rel_time_ns - TCSPC_TIME_OFFSET_NS) % LASER_PERIOD_NS
         
+    def plot_tcspc_data(self):
         plt.figure('Emitter TCSPC Histogram')
         plt.hist(self.filt_rel_time_shift_ns, bins = 300, range=(0,50), label='arrival time (shifted)', alpha=0.7)
         for tau in self.τ:

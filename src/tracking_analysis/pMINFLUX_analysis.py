@@ -30,10 +30,11 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from natsort import natsorted
 
-from config.configvar import (
+from tracking_analysis.config.configvar import (
     DIR_BASE,
     PSF_DIR_BASE,
     DATA_DIR_BASE,
+    IRF_DIR_BASE,
     LOCS_FILE_SUFFIX,
     PULSES_POS_NS,
     TCSPC_SUFFIX,
@@ -59,7 +60,7 @@ channel_name = 'red'
 meas_number = 14
 
 ebp_number = 2
-ebp_color = 'r'
+color = 'r'
 
 if meas_number==0:
     filename_base = meas_name + '_' + channel_name + '_' + date
@@ -78,10 +79,15 @@ bckg_filename = 'bckg_sixsites_red_20251217_arrays.ptu'
 # Data for background from dark counts estimation when power is variable during measurement (not always used!)
 bckg_dark_cnts_filename = 'bckg_dark_cnts__20250224-162247_.npy'
 
-psf_dir = PSF_DIR_BASE / Path(date + '_' + EBP_DIR_SUFFIX) / Path(str(ebp_number)) / Path(ebp_color) / PSF_FIT_DIR_NAME
+# IRF file (not always used!)
+irf_filename = 'IRF_red_20251217_60kHz1.ptu'
+
+psf_dir = PSF_DIR_BASE / Path(date + '_' + EBP_DIR_SUFFIX) / Path(str(ebp_number)) / Path(color) / PSF_FIT_DIR_NAME
 data_dir = DATA_DIR_BASE / date
+irf_dir = IRF_DIR_BASE / color
 tcspc_file = data_dir / tcspc_filename
 bckg_file = data_dir / bckg_filename
+irf_file = irf_dir / irf_filename
 bckg_file_dark_cnts_file = DIR_BASE / bckg_dark_cnts_filename
 timetrace_bin_width_s = 0.1
 target_n_ph = 1000
@@ -114,7 +120,12 @@ if __name__ == "__main__":
         print("Executing full analysis.")
         # execute full analysis if no previous result file is found
         tcspc_data = TCSPCData(tcspc_file, bckg_file, bckg_file_dark_cnts_file, timetrace_bin_width_s, PULSES_POS_NS)
-        minflux_analysis = MINFLUXAnalysis(ebp, tcspc_data, target_n_ph)
+        use_lifetime_fit_choice = input("Do you want to perform lifetime fit analysis? (y/n)")
+        if use_lifetime_fit_choice == 'y':
+            do_lifetime_fit = True
+        else:
+            do_lifetime_fit = False 
+        minflux_analysis = MINFLUXAnalysis(ebp, tcspc_data, irf_file, target_n_ph, do_lifetime_fit)
         locs_filepath_list.append(minflux_analysis.locs_results_filepath)
         result_filenumber_chosen = -1
     locs_dens_hist_bin_size = 1

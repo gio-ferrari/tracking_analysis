@@ -1,8 +1,10 @@
 from copy import deepcopy
 import numpy as np
+from pathlib import Path
 
-from tools.loc_tools import loc_trace_minflux
-from config.configvar import (
+from tracking_analysis.tools.pqreader_multiharp import load_ptu
+from tracking_analysis.tools.loc_tools import loc_trace_minflux
+from tracking_analysis.config.configvar import (
     NUM_PULSES,
     STEP_NM,
     LOCS_FILE_SUFFIX,
@@ -11,18 +13,48 @@ from tracking_analysis.ebp import EBP
 from tracking_analysis.tcspcdata import TCSPCData
 
 class MINFLUXAnalysis():
-    def __init__(self, ebp: EBP, tcspc_data: TCSPCData, target_n_ph: int):
+    def __init__(self, ebp: EBP, tcspc_data: TCSPCData, irf_file: Path, target_n_ph: int, do_lifetime_fit: bool):
         self.ebp = ebp
         self.tcspc_data = tcspc_data
+        self.irf_file = irf_file
         self.target_n_ph = target_n_ph
-        self.choose_locs_t_binning()
-        self.calc_ph_perloc_perpulse()
-        self.localizations = self.minflux_localize()
-        self.save_locs()
+        self.do_lifetime_fit = do_lifetime_fit
+        if self.do_lifetime_fit:
+            self.irf_raw = load_ptu(irf_file)
+        else:
+            self.choose_locs_t_binning()
+            self.calc_ph_perloc_perpulse()
+            self.localizations = self.minflux_localize()
+            self.save_locs()
         
     def choose_locs_t_binning(self):
         """
-        this function allows the user to choose the time binnin used for MINFLUX localizations
+        this function allows the user to choose the time binning used for MINFLUX localizations
+        """
+        target_locs_t_binning_s = float(self.target_n_ph) / self.tcspc_data.tot_counts_timegated
+        print(f"Localization time binning (in s) to obtain {self.target_n_ph} photons per bin: {target_locs_t_binning_s}")
+        self.locs_t_binning_s = float(input("Choose localization time binning (in s): "))
+        self.avg_n_ph_perloc = self.tcspc_data.tot_counts_timegated * self.locs_t_binning_s
+        print(f"Average number of photons per localization: {self.avg_n_ph_perloc}")
+        # compute background photons per localization bin, per pulse
+        self.bckg_ph_perloc_perpulse = np.empty(NUM_PULSES, dtype=np.float64)
+        for pulse_idx in range(NUM_PULSES):
+            if not self.tcspc_data.use_dark_cnts_choice:
+                self.bckg_ph_perloc_perpulse[pulse_idx] = self.tcspc_data.bckg_counts_timegated_perpulse[pulse_idx] * self.locs_t_binning_s
+                print(f"Expected background photons per localization for pulse {pulse_idx + 1}: {self.bckg_ph_perloc_perpulse[pulse_idx]}")
+            else:
+                self.bckg_dark_cnts_ph_perloc_perpulse = (self.tcspc_data.bckg_dark_cnts_timegated / NUM_PULSES) * self.locs_t_binning_s
+                self.bckg_ph_perloc_perpulse[pulse_idx] = ((self.tcspc_data.baseline_bckg_cnts_timegated_perpulse[pulse_idx] /
+                                                           (self.tcspc_data.sgnl_cnts_forbaseline_sbr_timegated - self.tcspc_data.bckg_dark_cnts_timegated) *
+                                                           (self.tcspc_data.tot_counts_timegated - self.tcspc_data.bckg_dark_cnts_timegated)) *
+                                                           self.locs_t_binning_s +
+                                                           self.bckg_dark_cnts_ph_perloc_perpulse) 
+                print(f"Expected background photons per localization for pulse {pulse_idx + 1}: {self.bckg_ph_perloc_perpulse[pulse_idx]}")
+                print(f"Of which from dark counts: {self.bckg_dark_cnts_ph_perloc_perpulse}")
+        
+    def choose_locs_t_binning(self):
+        """
+        this function allows the user to choose the time binning used for MINFLUX localizations
         """
         target_locs_t_binning_s = float(self.target_n_ph) / self.tcspc_data.tot_counts_timegated
         print(f"Localization time binning (in s) to obtain {self.target_n_ph} photons per bin: {target_locs_t_binning_s}")

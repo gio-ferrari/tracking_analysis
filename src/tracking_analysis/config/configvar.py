@@ -13,6 +13,7 @@ IRF_WIN_END_NS = 2
 DIR_BASE = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\EBPs")
 PSF_DIR_BASE = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\EBPs")
 DATA_DIR_BASE = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\Data_PyFLUX")
+IRF_DIR_BASE = Path(r"Y:\messdaten\Giovanni_B\IRFs\MINFLUX")
 LOCS_FILE_SUFFIX = "_locs_"
 SIGMA_TOL_OUTLIERS = 3
 COLOR_LIST = ['blue', 'orange', 'gray', 'yellow']
