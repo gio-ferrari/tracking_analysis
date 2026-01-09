@@ -5,9 +5,6 @@ import numpy.typing as npt
 import rocket_fft
 from scipy import fft
 
-rocket_fft._init_extension()
-
-
 def _njit(
     signature: str | list[str],
     *,
@@ -262,16 +259,26 @@ def nb_trunc_shift_exp_conv_eval_v2(
         # MRJD test:
         return inv_norm_fac * conv_exp
 
+@_njit("f8[:](f8[:], i8)")
+def pad_right_withzero(
+    arr_topad: npt.NDArray[np.float64],
+    ax_len: np.int64
+) -> npt.NDArray[np.float64]:
+    if arr_topad.size >= ax_len:
+        return arr_topad
+    else:
+        arr_padded = np.zeros(ax_len)
+        arr_padded[:arr_topad.size] = arr_topad
+        return arr_padded
 
-@_njit("f8[:](f8[:], f8[:], c16[:], f8, i8, f8, f8, f8, i8, i8, i8, c16[:], c16[:])")
-def nb_trunc_shift_exp_conv_eval_v3(
+@_njit("f8[:](f8[:], f8[:], c16[:], f8, i8, f8, f8, i8, i8, i8, c16[:], c16[:])")
+def nb_trunc_shift_exp_conv_eval_fullfs(
     x: npt.NDArray[np.float64],
     norm_irf_rs: npt.NDArray[np.float64],  # rs = real space
     norm_irf_fs: npt.NDArray[np.complex128],  # fs = fourier space
     tau: float,
     closest_idx: np.int64,
     delta_t: float,
-    c_bg: float,
     bin_sz_ns: float,
     rs_len_original: np.int64,
     rs_len_opt: np.int64,
@@ -295,9 +302,9 @@ def nb_trunc_shift_exp_conv_eval_v3(
     conv_exp = (
         -np.expm1(-bin_sz_ns * oo_tau)
         * fft.irfft(np.multiply(lorentz_eval, norm_irf_fs))[:rs_len_original]
-        + c_bg
     )
-
+    conv_exp = pad_right_withzero(conv_exp, rs_len_original)
+    
     # compute correction
     corr_const_fac = -np.expm1(delta_t * oo_tau) if delta_t != 0.0 else 0.0
     corr_const = corr_const_fac * norm_irf_rs

@@ -154,7 +154,7 @@ class TCSPCData():
         
     def shift_and_plot_tcspc_data(self):
         """
-        This function plots the decay curves of the TCSPC data, with and without translation, and the time windows used for analysis.
+        This function plots the decay curves of the TCSPC data, and the time windows used for analysis.
         """
         # shift TCSPC data (filtered, unfiltered and background) to put first pulse close to 0
         self.rel_time_shift_ns = (self.rel_time_ns - TCSPC_TIME_OFFSET_NS) % LASER_PERIOD_NS
