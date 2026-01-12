@@ -20,7 +20,8 @@ class MINFLUXAnalysis():
         self.target_n_ph = target_n_ph
         self.do_lifetime_fit = do_lifetime_fit
         if self.do_lifetime_fit:
-            self.irf_raw = load_ptu(irf_file)
+            self.choose_locs_t_binning_lt()
+            self.lifetime_analysis = LifetimeFitAnalysis(self.tcspc_data, irf_file, self.locs_t_binning_s)
         else:
             self.choose_locs_t_binning()
             self.calc_ph_perloc_perpulse()
@@ -52,30 +53,15 @@ class MINFLUXAnalysis():
                 print(f"Expected background photons per localization for pulse {pulse_idx + 1}: {self.bckg_ph_perloc_perpulse[pulse_idx]}")
                 print(f"Of which from dark counts: {self.bckg_dark_cnts_ph_perloc_perpulse}")
         
-    def choose_locs_t_binning(self):
+    def choose_locs_t_binning_lt(self):
         """
         this function allows the user to choose the time binning used for MINFLUX localizations
         """
-        target_locs_t_binning_s = float(self.target_n_ph) / self.tcspc_data.tot_counts_timegated
+        target_locs_t_binning_s = float(self.target_n_ph) / self.tcspc_data.avg_tot_counts
         print(f"Localization time binning (in s) to obtain {self.target_n_ph} photons per bin: {target_locs_t_binning_s}")
         self.locs_t_binning_s = float(input("Choose localization time binning (in s): "))
         self.avg_n_ph_perloc = self.tcspc_data.tot_counts_timegated * self.locs_t_binning_s
         print(f"Average number of photons per localization: {self.avg_n_ph_perloc}")
-        # compute background photons per localization bin, per pulse
-        self.bckg_ph_perloc_perpulse = np.empty(NUM_PULSES, dtype=np.float64)
-        for pulse_idx in range(NUM_PULSES):
-            if not self.tcspc_data.use_dark_cnts_choice:
-                self.bckg_ph_perloc_perpulse[pulse_idx] = self.tcspc_data.bckg_counts_timegated_perpulse[pulse_idx] * self.locs_t_binning_s
-                print(f"Expected background photons per localization for pulse {pulse_idx + 1}: {self.bckg_ph_perloc_perpulse[pulse_idx]}")
-            else:
-                self.bckg_dark_cnts_ph_perloc_perpulse = (self.tcspc_data.bckg_dark_cnts_timegated / NUM_PULSES) * self.locs_t_binning_s
-                self.bckg_ph_perloc_perpulse[pulse_idx] = ((self.tcspc_data.baseline_bckg_cnts_timegated_perpulse[pulse_idx] /
-                                                           (self.tcspc_data.sgnl_cnts_forbaseline_sbr_timegated - self.tcspc_data.bckg_dark_cnts_timegated) *
-                                                           (self.tcspc_data.tot_counts_timegated - self.tcspc_data.bckg_dark_cnts_timegated)) *
-                                                           self.locs_t_binning_s +
-                                                           self.bckg_dark_cnts_ph_perloc_perpulse) 
-                print(f"Expected background photons per localization for pulse {pulse_idx + 1}: {self.bckg_ph_perloc_perpulse[pulse_idx]}")
-                print(f"Of which from dark counts: {self.bckg_dark_cnts_ph_perloc_perpulse}")
         
     def calc_ph_perloc_perpulse(self):
         """
@@ -113,3 +99,8 @@ class MINFLUXAnalysis():
                                       'to' + str(int(self.tcspc_data.end_t_s)) + 's_' + str(int(self.locs_t_binning_s * 1e3)) + 'ms_binning.npy')
         self.locs_results_filepath = self.tcspc_data.tcspc_data_dir / self.locs_results_filename
         np.save(self.locs_results_filepath, self.localizations)
+        
+class LifetimeFitAnalysis():
+    def __init__(self, tcspc_data: TCSPCData, irf_file: Path):
+        self.irf_raw = load_ptu(irf_file)
+        self.tcspc_data = tcspc_data

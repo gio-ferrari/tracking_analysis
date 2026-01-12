@@ -34,7 +34,7 @@ class TCSPCData():
             self.bckg_abs_time_s, self.bckg_rel_time_ns = load_tcspc_data(self.bckg_data_path)
             self.tot_t_measuring_bckg_s = (self.bckg_abs_time_s.max() - self.bckg_abs_time_s.min())
         if self.use_dark_cnts_choice:
-            self.bckg_dark_cnts_abs_time_s, self.bckg_dark_cnts_rel_time_ns = self.load_tcspc_data(self.bckg_dark_cnts_data_path)
+            self.bckg_dark_cnts_abs_time_s, self.bckg_dark_cnts_rel_time_ns = load_tcspc_data(self.bckg_dark_cnts_data_path)
             self.tot_t_measuring_bckg_dark_cnts_s = (self.bckg_dark_cnts_abs_time_s.max() - self.bckg_dark_cnts_abs_time_s.min())
         # process and show data
         self.filter_time_data()
@@ -93,12 +93,39 @@ class TCSPCData():
         # if it is a single molecule, asks for intensity threshold to identify the photobleaching step and filter data based on that
         if self.is_single_mol:
             int_threshold = float(input("Intensity threshold for signal in Hz: "))
-            # find all the bin (left) edges where the molecule intensity is below the threshold
+            # find all the bin (left) edges where the molecule intensity is below/above the threshold
             dark_bin_edges = self.raw_timetrace_bin_edges[:-1][self.raw_timetrace_counts_hz < int_threshold]
-            # compute times until two nearest dark bins. The n-th element is the time between the (n-1)-th and the n-th dark bin
+            bright_bin_edges = self.raw_timetrace_bin_edges[:-1][self.raw_timetrace_counts_hz >= int_threshold]
+            # compute times until two nearest dark/bright bins. The n-th element is the time between the (n-1)-th and the n-th dark/bright bin
             t_tonext_dark_bin = np.concatenate(([dark_bin_edges[0]], np.diff(dark_bin_edges)))
-            # find the first bin of each dark period of the molecule
+            t_tonext_bright_bin = np.concatenate(([bright_bin_edges[0]], np.diff(bright_bin_edges)))
+            # find the first bin of each dark/bright period of the molecule
             start_dark_time = dark_bin_edges[t_tonext_dark_bin > (self.timetrace_bin_width_s * 1.5)]
+            start_bright_time = bright_bin_edges[t_tonext_bright_bin > (self.timetrace_bin_width_s * 1.5)]
+            # check whether the trace starts already in a dark state
+            if self.raw_timetrace_counts_hz[0] < int_threshold:
+                start_dark_time = np.concatenate(([self.raw_timetrace_bin_edges[0]], start_dark_time))
+            else:
+                start_bright_time = np.concatenate(([self.raw_timetrace_bin_edges[0]], start_bright_time))
+            # if the trace ends in a bright state, add an imaginary dark state at the end, so every bright state has an end (useful whe looping through bright states to filter data)
+            if self.raw_timetrace_counts_hz[-1] >= int_threshold:
+                start_dark_time = np.concatenate((start_dark_time, [self.raw_timetrace_bin_edges[-1]]))
+            # filter photons from off states
+            self.filt_rel_time_ns = np.array([])
+            self.filt_abs_time_s = np.array([])
+            for bright_state_idx in range(len(start_bright_time)):
+                self.filt_rel_time_ns = np.concatenate(
+                    self.filt_rel_time_ns,
+                    self.rel_time_ns[np.logical_and(
+                        self.abs_time_s > start_bright_time[bright_state_idx],
+                        self.abs_time_s < start_dark_time[bright_state_idx])
+                    ])
+                self.filt_abs_time_s = np.concatenate(
+                    self.filt_abs_time_s,
+                    self.rel_time_ns[np.logical_and(
+                        self.abs_time_s > start_bright_time[bright_state_idx],
+                        self.abs_time_s < start_dark_time[bright_state_idx])
+                    ])
             # the bleaching step is selected as the last time the molecule goes dark and never recovers
             self.bleach_t_s = start_dark_time[-1]
             print(f"Molecule photobleached after {self.bleach_t_s} s")
@@ -112,6 +139,8 @@ class TCSPCData():
             self.start_t_s_forbaseline_bckg = float(input("Start time to estimate baseline SBR in s: "))
             if not self.start_t_s_forbaseline_bckg:
                 self.start_t_s = 0.0
+            
+        self.tot_t_on = np.min((self.end_t_s, self.emitter_stop_t_s)) - self.start_t_s
             
         # here filter the data based on the start and end time selected by the user
         self.filt_rel_time_ns = self.rel_time_ns[np.logical_and(
@@ -145,7 +174,8 @@ class TCSPCData():
         
         print(f"Total number of detected photons in the relevant part of the measurement: {self.photons_tokeep}")
         self.avg_bckg_counts = len(self.bckg_abs_time_s) / self.tot_t_measuring_bckg_s
-        self.avg_emitter_counts = self.photons_tokeep / (np.min((self.end_t_s, self.emitter_stop_t_s)) - self.start_t_s) - self.avg_bckg_counts
+        self.avg_tot_counts = self.photons_tokeep / self.tot_t_on
+        self.avg_emitter_counts = self.avg_tot_counts - self.avg_bckg_counts
         self.avg_sbr_notimegating = self.avg_emitter_counts / self.avg_bckg_counts
         print("*****************************")
         print("Measure parameters before TCSPC timegating:")
