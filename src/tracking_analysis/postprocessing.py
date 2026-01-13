@@ -27,7 +27,6 @@ class DataPostProcessor():
         
         # open file containing localization results
         self.locs = self.load_locs(self.locs_filepath)
-        print(self.locs)
         # eliminate spatial outliers from localizations
         self.locs = self.eliminate_outliers(self.locs)
         if self.use_drift_data_choice:

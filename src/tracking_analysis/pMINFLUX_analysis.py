@@ -50,15 +50,15 @@ from tracking_analysis.tcspcdata import TCSPCData
 from tracking_analysis.minfluxanalysis import MINFLUXAnalysis
 from tracking_analysis.postprocessing import DataPostProcessor
 from tracking_analysis.origamianalysis import SMOrigamiAnalysis, ClockOrigamiAnalysis
-
+from tracking_analysis.endoivanalysis import EndoIVAnalysis
 
 plt.close('all')
 
 date = '20251217'
 
-meas_name = 'nc_sixsites_atto643'
+meas_name = 'nc_twosite_atto643'
 channel_name = 'red'
-meas_number = 14
+meas_number = 9
 
 ebp_number = 2
 color = 'r'
@@ -138,11 +138,20 @@ if __name__ == "__main__":
     else:
         use_drift_data_choice = False
     postproc = DataPostProcessor(locs_filepath_list[result_filenumber_chosen], drift_filepath_list, ebp, locs_dens_hist_bin_size, use_drift_data_choice, do_lifetime_fit)
-    sm_analysis_choice = input("Do you want to perform the analysis for the SM origami? (y/n) ")
-    if sm_analysis_choice == 'y':
-        sm_analysis = SMOrigamiAnalysis(postproc, locs_filepath_list[result_filenumber_chosen], data_dir)
-    else:
-        clock_analysis_choice = input("Do you want to perform the analysis for the clock origami? (y/n) ")
-        if clock_analysis_choice == 'y':
+    print("""Do you want to perform additional analysis? Press:
+1 for single-molecule/point-emitter analysis
+2 for 2 sites clock analysis
+3 for Endo IV bending analysis
+any other key for no additional analsis""")
+    analysis_choice = input()
+    match analysis_choice:
+        case '1':
+            sm_analysis = SMOrigamiAnalysis(postproc, locs_filepath_list[result_filenumber_chosen], data_dir)
+        case '2':
             clock_analysis = ClockOrigamiAnalysis(postproc, locs_filepath_list[result_filenumber_chosen], data_dir)
+        case '3':
+            endoiv_analysis = EndoIVAnalysis(postproc, locs_filepath_list[result_filenumber_chosen], data_dir)
+        
+
+
 
