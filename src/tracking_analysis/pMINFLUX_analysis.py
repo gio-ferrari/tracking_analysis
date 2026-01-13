@@ -35,7 +35,8 @@ from tracking_analysis.config.configvar import (
     PSF_DIR_BASE,
     DATA_DIR_BASE,
     IRF_DIR_BASE,
-    LOCS_FILE_SUFFIX,
+    LOCS_FILE_SUFFIX_NOLT,
+    LOCS_FILE_SUFFIX_LT,
     PULSES_POS_NS,
     TCSPC_SUFFIX,
     TCSPC_EXT,
@@ -84,7 +85,7 @@ irf_filename = 'IRF_red_20251217_60kHz1.ptu'
 
 psf_dir = PSF_DIR_BASE / Path(date + '_' + EBP_DIR_SUFFIX) / Path(str(ebp_number)) / Path(color) / PSF_FIT_DIR_NAME
 data_dir = DATA_DIR_BASE / date
-irf_dir = IRF_DIR_BASE / color
+irf_dir = IRF_DIR_BASE / channel_name
 tcspc_file = data_dir / tcspc_filename
 bckg_file = data_dir / bckg_filename
 irf_file = irf_dir / irf_filename
@@ -102,10 +103,17 @@ if __name__ == "__main__":
     # Open fitted experimental PSFs
     ebp = EBP(psf_dir)
     # look for pre-existing result files
+    use_lifetime_fit_choice = input("Do you want to perform lifetime fit analysis? (y/n)")
+    if use_lifetime_fit_choice == 'y':
+        do_lifetime_fit = True
+        locs_file_suff = LOCS_FILE_SUFFIX_LT
+    else:
+        do_lifetime_fit = False
+        locs_file_suff = LOCS_FILE_SUFFIX_NOLT
     locs_filepath_list = []
     for filepath in natsorted(data_dir.iterdir()):
         if filepath.is_file():
-            if (tcspc_filename.split('.')[0] in filepath.name) and (LOCS_FILE_SUFFIX in filepath.name):
+            if (tcspc_filename.split('.')[0] in filepath.name) and (locs_file_suff in filepath.name):
                 locs_filepath_list.append(filepath)
     if locs_filepath_list:
         print("Result files found:")
@@ -120,11 +128,6 @@ if __name__ == "__main__":
         print("Executing full analysis.")
         # execute full analysis if no previous result file is found
         tcspc_data = TCSPCData(tcspc_file, bckg_file, bckg_file_dark_cnts_file, timetrace_bin_width_s, PULSES_POS_NS)
-        use_lifetime_fit_choice = input("Do you want to perform lifetime fit analysis? (y/n)")
-        if use_lifetime_fit_choice == 'y':
-            do_lifetime_fit = True
-        else:
-            do_lifetime_fit = False 
         minflux_analysis = MINFLUXAnalysis(ebp, tcspc_data, irf_file, target_n_ph, do_lifetime_fit)
         locs_filepath_list.append(minflux_analysis.locs_results_filepath)
         result_filenumber_chosen = -1
@@ -134,7 +137,7 @@ if __name__ == "__main__":
         use_drift_data_choice = True
     else:
         use_drift_data_choice = False
-    postproc = DataPostProcessor(locs_filepath_list[result_filenumber_chosen], drift_filepath_list, ebp, locs_dens_hist_bin_size, use_drift_data_choice)
+    postproc = DataPostProcessor(locs_filepath_list[result_filenumber_chosen], drift_filepath_list, ebp, locs_dens_hist_bin_size, use_drift_data_choice, do_lifetime_fit)
     sm_analysis_choice = input("Do you want to perform the analysis for the SM origami? (y/n) ")
     if sm_analysis_choice == 'y':
         sm_analysis = SMOrigamiAnalysis(postproc, locs_filepath_list[result_filenumber_chosen], data_dir)

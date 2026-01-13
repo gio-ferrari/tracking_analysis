@@ -48,6 +48,11 @@ def safe_log(x: np.float64):
     # guard against x = 0
     return np.log(np.maximum(_TINY_FLOAT, x))
 
+@_njit("c16(c16, c16)")
+def safe_compl_divide(num: np.complex128, denom: np.complex128):
+    if denom.real*denom.real + denom.imag*denom.imag < _TINY_FLOAT:
+        return np.nan + 1j*np.nan
+    return num / denom
 
 # @nb.njit(cache=True, nogil=True, inline="always", fastmath=True, parallel=False)
 # def compute_histo_vals(
@@ -151,9 +156,7 @@ def modulated_half_lorentz(
     real_exp_fact_rs_len = np.exp(-(rs_len_opt - closest_idx) * bin_sz_ns * oo_tau)
     # real_exp_fact_closest_idx = np.exp(- closest_idx * bin_sz_ns * oo_tau)
     for i in range(0, fs_len):
-        result[i] = (exp_coeff_closest_idx[i] - real_exp_fact_rs_len) / (
-            1 - real_exp_fact * exp_coeff[i]
-        )
+        result[i] = safe_compl_divide(exp_coeff_closest_idx[i] - real_exp_fact_rs_len, 1 - real_exp_fact * exp_coeff[i])
     # print(result)
     return result
 

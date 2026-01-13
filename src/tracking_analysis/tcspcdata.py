@@ -102,11 +102,14 @@ class TCSPCData():
             # find the first bin of each dark/bright period of the molecule
             start_dark_time = dark_bin_edges[t_tonext_dark_bin > (self.timetrace_bin_width_s * 1.5)]
             start_bright_time = bright_bin_edges[t_tonext_bright_bin > (self.timetrace_bin_width_s * 1.5)]
-            # check whether the trace starts already in a dark state
+            # check whether the trace starts already in a dark/bright state, and if it switches immediately at the second bin
             if self.raw_timetrace_counts_hz[0] < int_threshold:
-                start_dark_time = np.concatenate(([self.raw_timetrace_bin_edges[0]], start_dark_time))
+                if self.raw_timetrace_counts_hz[1] >= int_threshold:
+                    start_bright_time = np.concatenate(([self.raw_timetrace_bin_edges[1]], start_bright_time))
             else:
                 start_bright_time = np.concatenate(([self.raw_timetrace_bin_edges[0]], start_bright_time))
+                if self.raw_timetrace_counts_hz[1] < int_threshold:
+                    start_dark_time = np.concatenate(([self.raw_timetrace_bin_edges[1]], start_dark_time))
             # if the trace ends in a bright state, add an imaginary dark state at the end, so every bright state has an end (useful whe looping through bright states to filter data)
             if self.raw_timetrace_counts_hz[-1] >= int_threshold:
                 start_dark_time = np.concatenate((start_dark_time, [self.raw_timetrace_bin_edges[-1]]))
@@ -114,18 +117,18 @@ class TCSPCData():
             self.filt_rel_time_ns = np.array([])
             self.filt_abs_time_s = np.array([])
             for bright_state_idx in range(len(start_bright_time)):
-                self.filt_rel_time_ns = np.concatenate(
+                self.filt_rel_time_ns = np.concatenate((
                     self.filt_rel_time_ns,
                     self.rel_time_ns[np.logical_and(
                         self.abs_time_s > start_bright_time[bright_state_idx],
                         self.abs_time_s < start_dark_time[bright_state_idx])
-                    ])
-                self.filt_abs_time_s = np.concatenate(
+                    ]))
+                self.filt_abs_time_s = np.concatenate((
                     self.filt_abs_time_s,
-                    self.rel_time_ns[np.logical_and(
+                    self.abs_time_s[np.logical_and(
                         self.abs_time_s > start_bright_time[bright_state_idx],
                         self.abs_time_s < start_dark_time[bright_state_idx])
-                    ])
+                    ]))
             # the bleaching step is selected as the last time the molecule goes dark and never recovers
             self.bleach_t_s = start_dark_time[-1]
             print(f"Molecule photobleached after {self.bleach_t_s} s")

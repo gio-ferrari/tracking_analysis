@@ -22,6 +22,7 @@ numba = "^0.63.1"
 rocket-fft = ">=0.2.4,<0.3"
 future = "^1.0.0"
 iminuit = "^2.32.0"
+tqdm = "^4.67.1"
 
 
 [build-system]

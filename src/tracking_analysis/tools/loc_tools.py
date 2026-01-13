@@ -3,7 +3,7 @@ import numba as nb
 from numba import types, typed
 from typing import Union, List
 
-from tracking_analysis.config.configvar import NUM_PULSES
+from tracking_analysis.config.configvar import NUM_PULSES, MIN_PH_MINFLUX_LOC
 
 def indexToSpace(index, size_nm, px_nm):
     space = np.zeros(2)
@@ -102,6 +102,29 @@ def pos_minflux(n, normed_psfs, sbr, bckg_contrib, step_nm):
     
     return pos_estimator
 
+def pos_minflux_nobg(n, normed_psfs, step_nm):
+    # FOV size
+    size = np.shape(normed_psfs)[1]
+    
+    # probabilitiy vector 
+    p = np.zeros((NUM_PULSES, size, size))
+
+    for pulse_idx in np.arange(NUM_PULSES):
+        p[pulse_idx,:,:] = normed_psfs[pulse_idx,:,:]
+
+    # likelihood function
+    L = np.zeros((NUM_PULSES,size, size))
+    for pulse_idx in np.arange(NUM_PULSES):
+        L[pulse_idx, :, :] = n[pulse_idx] * np.log(p[pulse_idx, : , :])
+        
+    Ltot = np.sum(L, axis = 0)
+
+    # maximum likelihood estimator for the position    
+    indrec = np.unravel_index(np.argmax(Ltot, axis=None), Ltot.shape)
+    pos_estimator = indexToSpace(indrec, size, step_nm)
+    
+    return pos_estimator
+
 def loc_trace_minflux(ph_perloc_perpulse, bckg_ph_perloc_perpulse, sbr_perloc, psfs, step_nm):
     """
     This function computes the whole localization trace using MINFLUX localization algorithm (MLE)
@@ -130,7 +153,43 @@ def loc_trace_minflux(ph_perloc_perpulse, bckg_ph_perloc_perpulse, sbr_perloc, p
     bckg_contrib = bckg_ph_perloc_perpulse / tot_bckg_ph_inloc
     locs = np.empty((n_loc, 2), dtype=float)
     for loc_idx in range(n_loc):
-        locs[loc_idx, :] = pos_minflux(ph_perloc_perpulse[:, loc_idx], normed_psfs, sbr_perloc[loc_idx], bckg_contrib, step_nm)
+        if np.sum(ph_perloc_perpulse[:, loc_idx]>MIN_PH_MINFLUX_LOC):
+            locs[loc_idx, :] = pos_minflux(ph_perloc_perpulse[:, loc_idx], normed_psfs, sbr_perloc[loc_idx], bckg_contrib, step_nm)
+        else:
+            locs[loc_idx, 0] = np.nan
+            locs[loc_idx, 1] = np.nan
+    return locs
+
+def loc_trace_minflux_lt(ph_perloc_perpulse, psfs, step_nm):
+    """
+    This function computes the whole localization trace using MINFLUX localization algorithm (MLE)
+    
+    Inputs
+    ----------
+    ph_perloc_perpulse : array of number of photons for each localization and pulse (number of pulses x number of locs)
+    bckg_ph_perloc_perpulse: number of background photons per localization and for each pulse (number of locs)
+    sbr_perloc: SBR for each localization (number of locs)
+    psfs : array with PSFs (number of pulses x size x size)
+    
+    Returns
+    -------
+    locs : array of all estimated localizations
+    
+    Parameters 
+    ----------
+    step_nm : grid step in nm
+    """
+    # compute normalized psfs
+    psf_norm = np.sum(psfs, axis = 0)
+    normed_psfs = psfs / psf_norm
+    n_loc = len(ph_perloc_perpulse[0,:])
+    locs = np.empty((n_loc, 2), dtype=float)
+    for loc_idx in range(n_loc):
+        if any(np.isnan(n_ph) for n_ph in ph_perloc_perpulse[:, loc_idx]):
+            locs[loc_idx, 0] = np.nan
+            locs[loc_idx, 1] = np.nan
+        else:
+            locs[loc_idx, :] = pos_minflux_nobg(ph_perloc_perpulse[:, loc_idx], normed_psfs, step_nm)
     return locs
 
 def crb_minflux(NUM_PULSES, PSF, SBR, px_nm, size_nm, N, method='1'):

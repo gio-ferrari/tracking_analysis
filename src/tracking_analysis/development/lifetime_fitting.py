@@ -121,7 +121,7 @@ class LifetimeFit():
         }
         return guess_dict
         
-    def calc_monoexp(self, tau: np.float64, shift: np.float64, a1: np.float64, a2: np.float64, a3: np.float64) -> np.float64:
+    def calc_monoexp(self, tau: np.float64, shift: np.float64, a1: np.float64, a2: np.float64, a3: np.float64) -> npt.NDArray[np.float64]:
         fitting_fn = np.zeros(self.nanot_ax_len)
         weights = [a1, a2, a3, 1 - (a1 + a2 + a3)]
         closest_idx = self.nanot_ax_ns.searchsorted(shift, side="right")

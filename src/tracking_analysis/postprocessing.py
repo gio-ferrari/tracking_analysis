@@ -13,18 +13,21 @@ from tracking_analysis.config.configvar import (
     CENTRAL_DONA_IDX,
     MAX_DIST_FROMEBP_CENT_NM
 )
-from ebp import EBP
+from tracking_analysis.ebp import EBP
 
 class DataPostProcessor():
-    def __init__(self, locs_filepath: Path, drift_filepath_list: List[Path], ebp: EBP, bin_size: int, use_drift_data_choice: bool):
+    def __init__(self, locs_filepath: Path, drift_filepath_list: List[Path], ebp: EBP, bin_size: int, use_drift_data_choice: bool, use_lifetime: bool):
         self.locs_filepath = locs_filepath
+        print(self.locs_filepath)
         self.drift_filepath_list = drift_filepath_list
         self.ebp = ebp
         self.bin_size = bin_size
         self.use_drift_data_choice = use_drift_data_choice
+        self.use_lifetime = use_lifetime
         
         # open file containing localization results
         self.locs = self.load_locs(self.locs_filepath)
+        print(self.locs)
         # eliminate spatial outliers from localizations
         self.locs = self.eliminate_outliers(self.locs)
         if self.use_drift_data_choice:
@@ -48,6 +51,10 @@ class DataPostProcessor():
         self.plot_locs_timecoded_withebp(self.locs_centered)
         self.plot_loc_density_withebp(self.locs_centered)
         self.plot_locs_withcrb(self.locs_centered)
+        
+        if self.use_lifetime:
+            self.plot_lt_trace(self.locs_centered)
+            self.plot_locs_wlt(self.locs_centered)
         
     def load_locs(self, locs_filepath):
         """
@@ -312,3 +319,23 @@ class DataPostProcessor():
         plt.title('σ_CRB with Aligned Reference Frame')
         plt.tight_layout()
         plt.show()
+    
+    def plot_lt_trace(self, locs):
+        plt.plot(locs[:, 0], locs[:, 5])
+        plt.show()
+        
+    def plot_locs_wlt(self, locs):
+        """
+        This function plots all (filtered) localizations, encoding with lifetime, superposed with the EBP
+        """
+        plt.figure('Lifetime-encoded localizations')
+        for beam_idx, min_pos in enumerate(self.ebp.pos_mins_centered_nm):
+            plt.scatter(*min_pos, color=self.ebp.psf_colors[beam_idx], s=100)
+        plt.scatter(locs[:, 1], locs[:, 2], c=(locs[:, 5]), cmap='rainbow', vmin=0, vmax=5, s=20, alpha=0.05)
+        color_bar = plt.colorbar(label="Lifetime [ns]", orientation="vertical")
+        color_bar.solids.set(alpha=1)
+        plt.xlim(self.x_plot_range)
+        plt.ylim(self.y_plot_range)
+        # Annotations
+        plt.gca().set_aspect('equal'), plt.xlabel('x (nm)'), plt.ylabel('y (nm)'), plt.tight_layout()
+        plt.show()       
