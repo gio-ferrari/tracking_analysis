@@ -24,13 +24,14 @@ class TCSPCData():
         # get folder and filename of the tcspc data file
         self.tcspc_data_dir = self.tcspc_data_path.parent
         self.tcspc_data_filename = self.tcspc_data_path.stem
-        # load TCSPC data, plot timetrace and ask if there is a photobleaching step
+        
         self.abs_time_s, self.rel_time_ns = load_tcspc_data(self.tcspc_data_path)
         self.tot_t_measuring_s = (self.abs_time_s.max() - self.abs_time_s.min())
-        self.plot_timetrace()
-        self.ask_analysis_type()
+        
+        self.raw_timetrace_bin_edges, self.raw_timetrace_counts_hz = self.plot_timetrace()
+        self.ask_if_photobleach()
         # if there is no photobleaching step, gets background data from separate file
-        if not self.is_single_mol:
+        if not self.is_photobleached:
             self.bckg_abs_time_s, self.bckg_rel_time_ns = load_tcspc_data(self.bckg_data_path)
             self.tot_t_measuring_bckg_s = (self.bckg_abs_time_s.max() - self.bckg_abs_time_s.min())
         if self.use_dark_cnts_choice:
@@ -47,24 +48,25 @@ class TCSPCData():
         This function plots the intensity time trace of the measurement
         """
         plt.figure("Histogram abs_time")
-        self.raw_timetrace_bin_edges = np.arange(0, self.tot_t_measuring_s + self.timetrace_bin_width_s, self.timetrace_bin_width_s)
-        self.raw_timetrace_counts_hz, _, _ = plt.hist(self.abs_time_s, bins=self.raw_timetrace_bin_edges, alpha=0.7, color='blue', weights=np.ones_like(self.abs_time_s) / self.timetrace_bin_width_s)
+        raw_timetrace_bin_edges = np.arange(0, self.tot_t_measuring_s + self.timetrace_bin_width_s, self.timetrace_bin_width_s)
+        raw_timetrace_counts_hz, _, _ = plt.hist(self.abs_time_s, bins=raw_timetrace_bin_edges, alpha=0.7, color='blue', weights=np.ones_like(self.abs_time_s) / self.timetrace_bin_width_s)
         plt.xlabel("Time [s]")
         plt.ylabel("Counts [Hz]")
         plt.title("Time trace")
         plt.tight_layout()
         plt.show()
+        return self.raw_timetrace_bin_edges, self.raw_timetrace_counts_hz
         
-    def ask_analysis_type(self):
+    def ask_if_photobleach(self):
         """
         This function asks the user whether the measurement presents a photobleaching step or not. If yes, the background will be extracted
         from the measurement itself, after the photobleaching steps. Otherwise, a separate background file will be loaded.
         """
         is_there_photobleach = input("Does the measurement present a photobleaching step? (y/n) ")
         if is_there_photobleach == 'y':
-            self.is_single_mol = True
+            self.is_photobleached = True
         else:
-            self.is_single_mol = False
+            self.is_photobleached = False
         #use_dark_cnts_choice_input = input("Do you want to use a dark counts measurement? (y/n) ")
         use_dark_cnts_choice_input = 'n'
         if use_dark_cnts_choice_input == 'y':
@@ -91,11 +93,12 @@ class TCSPCData():
         else:
             self.end_t_s = float( self.end_t_input)
         # if it is a single molecule, asks for intensity threshold to identify the photobleaching step and filter data based on that
-        if self.is_single_mol:
+        if self.is_photobleached:
             int_threshold = float(input("Intensity threshold for signal in Hz: "))
             # find all the bin (left) edges where the molecule intensity is below/above the threshold
             dark_bin_edges = self.raw_timetrace_bin_edges[:-1][self.raw_timetrace_counts_hz < int_threshold]
             bright_bin_edges = self.raw_timetrace_bin_edges[:-1][self.raw_timetrace_counts_hz >= int_threshold]
+            self.eff_time_on = len(bright_bin_edges)*self.timetrace_bin_width_s
             # compute times until two nearest dark/bright bins. The n-th element is the time between the (n-1)-th and the n-th dark/bright bin
             t_tonext_dark_bin = np.concatenate(([dark_bin_edges[0]], np.diff(dark_bin_edges)))
             t_tonext_bright_bin = np.concatenate(([bright_bin_edges[0]], np.diff(bright_bin_edges)))
@@ -155,7 +158,7 @@ class TCSPCData():
             self.abs_time_s < np.min((self.end_t_s, self.emitter_stop_t_s))
         )]
         # only if it is a single molecule, gets the background counts from the measurement itself, after photobleaching
-        if self.is_single_mol:
+        if self.is_photobleached:
             print(f"Background starts at {self.bckg_start_t_s}")
             self.bckg_rel_time_ns = self.rel_time_ns[self.abs_time_s > self.bckg_start_t_s]
             self.bckg_abs_time_s = self.abs_time_s[self.abs_time_s > self.bckg_start_t_s]

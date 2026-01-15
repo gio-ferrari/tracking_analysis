@@ -102,7 +102,7 @@ for drift_filepath in natsorted(data_dir.iterdir()):
 if __name__ == "__main__":
     # Open fitted experimental PSFs
     ebp = EBP(psf_dir)
-    # look for pre-existing result files
+    # here it is decided whether to use lifetime fitting or not
     use_lifetime_fit_choice = input("Do you want to perform lifetime fit analysis? (y/n)")
     if use_lifetime_fit_choice == 'y':
         do_lifetime_fit = True
@@ -110,6 +110,7 @@ if __name__ == "__main__":
     else:
         do_lifetime_fit = False
         locs_file_suff = LOCS_FILE_SUFFIX_NOLT
+    # look for pre-existing result files
     locs_filepath_list = []
     for filepath in natsorted(data_dir.iterdir()):
         if filepath.is_file():
