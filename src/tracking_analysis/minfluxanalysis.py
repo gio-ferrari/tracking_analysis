@@ -231,6 +231,9 @@ class LifetimeFitAnalysis():
         return ph_perloc_perpulse, tot_ph_perloc, sbr_perloc, lifetime_trace 
             
     def calc_guess(self):
+        """
+        This function computes reasonable guesses for the MLE fit
+        """
         tau_guess_arr = np.empty(NUM_PULSES)
         shift_guess_arr = np.empty(NUM_PULSES)
         n_ph_guess_arr = np.empty(NUM_PULSES)
@@ -267,6 +270,11 @@ class LifetimeFitAnalysis():
         return guess_dict
         
     def calc_monoexp(self, tau: np.float64, shift: np.float64, a1: np.float64, a2: np.float64, a3: np.float64) -> npt.NDArray[np.float64]:
+        """
+        This function computes the full fitting function, consisting of a shifted monoexponential convoluted with the IRF, where each IRF peak is
+        rescaled with a factor, and the smoothed background is then summed. Free parameters are: lifetime, exponential time offset and 3 out of 4 multiplicative
+        factors for the IRF peaks (the last one is computed to keep normalization correct).
+        """
         fitting_fn = np.zeros(self.nanot_ax_len)
         weights = [a1, a2, a3, 1 - (a1 + a2 + a3)]
         closest_idx = self.nanot_ax_ns.searchsorted(shift, side="right")
@@ -303,8 +311,8 @@ class LifetimeFitAnalysis():
     
     def calc_cost_monoexp(self, tau: np.float64, shift: np.float64, a1: np.float64, a2: np.float64, a3: np.float64) -> np.float64:
         """
-        Function to be called from Minuit for minimization
-        -> has to follow the cost_fn_spec: fn(arg1, arg2, ...)
+        Function to be called from Minuit for minimization.
+        Computes the cost function for a MLE fit using a convoluted shifted monoexponential decay with time-correlated background added.
         """
         fitting_fn = self.calc_monoexp(tau, shift, a1, a2, a3)
         res = calc_cost(fitting_fn, self.data_hist_normed_nt)

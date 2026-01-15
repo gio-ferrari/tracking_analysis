@@ -55,7 +55,7 @@ class TCSPCData():
         plt.title("Time trace")
         plt.tight_layout()
         plt.show()
-        return self.raw_timetrace_bin_edges, self.raw_timetrace_counts_hz
+        return raw_timetrace_bin_edges, raw_timetrace_counts_hz
         
     def ask_if_photobleach(self):
         """
