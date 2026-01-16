@@ -25,17 +25,18 @@ class TCSPCData():
         self.tcspc_data_dir = self.tcspc_data_path.parent
         self.tcspc_data_filename = self.tcspc_data_path.stem
         
-        self.abs_time_s, self.rel_time_ns = load_tcspc_data(self.tcspc_data_path)
+        self.abs_time_s, self.rel_time_ns, self.channels  = load_tcspc_data(self.tcspc_data_path)
+        print(self.channels)
         self.tot_t_measuring_s = (self.abs_time_s.max() - self.abs_time_s.min())
         
         self.raw_timetrace_bin_edges, self.raw_timetrace_counts_hz = self.plot_timetrace()
         self.ask_if_photobleach()
         # if there is no photobleaching step, gets background data from separate file
         if not self.is_photobleached:
-            self.bckg_abs_time_s, self.bckg_rel_time_ns = load_tcspc_data(self.bckg_data_path)
+            self.bckg_abs_time_s, self.bckg_rel_time_ns, self.channels_bckg = load_tcspc_data(self.bckg_data_path)
             self.tot_t_measuring_bckg_s = (self.bckg_abs_time_s.max() - self.bckg_abs_time_s.min())
         if self.use_dark_cnts_choice:
-            self.bckg_dark_cnts_abs_time_s, self.bckg_dark_cnts_rel_time_ns = load_tcspc_data(self.bckg_dark_cnts_data_path)
+            self.bckg_dark_cnts_abs_time_s, self.bckg_dark_cnts_rel_time_ns, self.channels_bckg_dark_cnts = load_tcspc_data(self.bckg_dark_cnts_data_path)
             self.tot_t_measuring_bckg_dark_cnts_s = (self.bckg_dark_cnts_abs_time_s.max() - self.bckg_dark_cnts_abs_time_s.min())
         # process and show data
         self.filter_time_data()

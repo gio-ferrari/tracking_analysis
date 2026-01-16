@@ -28,7 +28,7 @@ def load_tcspc_data(tcspc_data_path):
         
     print("length", len(data))
 #    print(data)
-    relTime, absTime = convertHT3(data)
+    relTime, absTime, tags = convertHT3(data)
     
     # channel = coord[2, :]
     # absTime = coord[1, :]
@@ -41,7 +41,7 @@ def load_tcspc_data(tcspc_data_path):
     absTime = absTime * globRes #s
     relTime = relTime * timeRes * 1e9 #ns
     
-    return absTime, relTime
+    return absTime, relTime, tags
 
 def convertHT3(countlist):
     oflcorrection = 0
@@ -107,4 +107,4 @@ def convertHT3(countlist):
             sys.stdout.write("\rProgress: %.1f%%" % (float(recNum)*100/float(len(countlist))))
             
             sys.stdout.flush()  
-    return dtime_array[truensync_array != 0], truensync_array[truensync_array != 0]
+    return dtime_array[truensync_array != 0], truensync_array[truensync_array != 0], channel_array[truensync_array != 0]
