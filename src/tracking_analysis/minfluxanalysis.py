@@ -290,21 +290,25 @@ class LifetimeFitAnalysis():
                                                                      self.exp_coeff_closest_idx,)
             self.last_closest_idx = closest_idx
         
+        complete_irf = np.zeros(self.nanot_ax_len)
+        complete_irf_ft = np.zeros(len(self.irf_pulses_hist_norm_ft[0]), dtype=np.complex128)
         for pulse_idx in range(NUM_PULSES):
-            fitting_fn += weights[pulse_idx]*nb_trunc_shift_exp_conv_eval_fullfs_wobg(
-                self.nanot_ax_ns,
-                self.irf_pulses_hist_norm[pulse_idx],  # rs = real space
-                self.irf_pulses_hist_norm_ft[pulse_idx],  # fs = fourier space
-                tau,
-                closest_idx,
-                delta_t,
-                TCSPC_NANOT_RES_PS*1e-3,
-                self.nanot_ax_len,
-                self.nanot_ax_len_opt,
-                self.fs_len,
-                self.exp_coeff,
-                self.exp_coeff_closest_idx,
-            )
+            complete_irf += weights[pulse_idx]*self.irf_pulses_hist_norm[pulse_idx]
+            complete_irf_ft += weights[pulse_idx]*self.irf_pulses_hist_norm_ft[pulse_idx]
+        fitting_fn += nb_trunc_shift_exp_conv_eval_fullfs_wobg(
+            self.nanot_ax_ns,
+            complete_irf,  # rs = real space
+            complete_irf_ft,  # fs = fourier space
+            tau,
+            closest_idx,
+            delta_t,
+            TCSPC_NANOT_RES_PS*1e-3,
+            self.nanot_ax_len,
+            self.nanot_ax_len_opt,
+            self.fs_len,
+            self.exp_coeff,
+            self.exp_coeff_closest_idx,
+        )
         fitting_fn *= self.signal_contr
         fitting_fn += self.bckg_smooth_norm_hist*self.bckg_contr
         return fitting_fn
