@@ -54,13 +54,13 @@ from tracking_analysis.endoivanalysis import EndoIVAnalysis
 
 plt.close('all')
 
-date = '20251217'
+date = '20260123'
 
-meas_name = 'nc_twosite_atto643'
+meas_name = 'g1_APPTO45_mol3'
 channel_name = 'red'
-meas_number = 9
+meas_number = 0
 
-ebp_number = 2
+ebp_number = 4
 color = 'r'
 
 if meas_number==0:
@@ -81,7 +81,7 @@ bckg_filename = 'bckg_sixsites_red_20251217_arrays.ptu'
 bckg_dark_cnts_filename = 'bckg_dark_cnts__20250224-162247_.npy'
 
 # IRF file (not always used!)
-irf_filename = 'IRF_red_20251217_60kHz1.ptu'
+irf_filename = 'IRF_MINFLUX_red_20260120_60kcps_1.ptu'
 
 psf_dir = PSF_DIR_BASE / Path(date + '_' + EBP_DIR_SUFFIX) / Path(str(ebp_number)) / Path(color) / PSF_FIT_DIR_NAME
 data_dir = DATA_DIR_BASE / date

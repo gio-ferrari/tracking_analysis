@@ -22,7 +22,8 @@ from tracking_analysis.config.configvar import (
     STEP_NM,
     LOCS_FILE_SUFFIX_NOLT,
     LOCS_FILE_SUFFIX_LT,
-    MIN_PH_MINFLUX_LOC_LT
+    MIN_PH_MINFLUX_LOC_LT,
+    LIFETIME_CUTOFF_NS
 )
 from tracking_analysis.ebp import EBP
 from tracking_analysis.tcspcdata import TCSPCData
@@ -41,6 +42,7 @@ class MINFLUXAnalysis():
             self.ph_perloc_perpulse, self.ph_perloc_allpulses, self.sbr_perloc, self.lifetime_trace = self.lifetime_analysis.get_n_ph_perpulse_from_lt_fit()
             self.localizations_wlt = self.minflux_localize_wlt()
             self.localizations_wlt = self.localizations_wlt[(~np.isnan(self.localizations_wlt[:,1])) & (~np.isnan(self.localizations_wlt[:,2]))]
+            self.localizations_wlt = self.localizations_wlt[(self.localizations_wlt[:,5] > 0) & (self.localizations_wlt[:,5] < LIFETIME_CUTOFF_NS)]
             self.save_locs()
         else:
             self.choose_locs_t_binning()
@@ -318,8 +320,11 @@ class LifetimeFitAnalysis():
         Function to be called from Minuit for minimization.
         Computes the cost function for a MLE fit using a convoluted shifted monoexponential decay with time-correlated background added.
         """
-        fitting_fn = self.calc_monoexp(tau, shift, a1, a2, a3)
-        res = calc_cost(fitting_fn, self.data_hist_normed_nt)
+        try:
+            fitting_fn = self.calc_monoexp(tau, shift, a1, a2, a3)
+            res = calc_cost(fitting_fn, self.data_hist_normed_nt)
+        except Exception:
+            return np.inf
         return res
         
     def eval_minuit_fit_monoexp(

@@ -48,11 +48,11 @@ def safe_log(x: np.float64):
     # guard against x = 0
     return np.log(np.maximum(_TINY_FLOAT, x))
 
-@_njit("c16(c16, c16)")
+@_njit("c16(c16, c16)", cache=False)
 def safe_compl_divide(num: np.complex128, denom: np.complex128):
-    if denom.real*denom.real + denom.imag*denom.imag < _TINY_FLOAT:
-        return np.nan + 1j*np.nan
-    return num / denom
+    if np.isfinite(num) and np.isfinite(denom) and (np.abs(denom) > _TINY_FLOAT):
+        return num / denom
+    return np.nan+1j*np.nan
 
 # @nb.njit(cache=True, nogil=True, inline="always", fastmath=True, parallel=False)
 # def compute_histo_vals(

@@ -14,7 +14,7 @@ DIR_BASE = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\EBPs")
 PSF_DIR_BASE = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\EBPs")
 DATA_DIR_BASE = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\Data_PyFLUX")
 IRF_DIR_BASE = Path(r"Y:\messdaten\Giovanni_B\MINFLUX\IRFs")
-LOCS_FILE_SUFFIX_NOLT = "_locs_"
+LOCS_FILE_SUFFIX_NOLT = "_locs_nolt"
 LOCS_FILE_SUFFIX_LT = "_locs_wlt_"
 SIGMA_TOL_OUTLIERS = 3
 COLOR_LIST = ['blue', 'orange', 'gray', 'yellow']
@@ -30,3 +30,5 @@ TCSPC_SUFFIX = 'arrays'
 TCSPC_EXT = '.ptu'
 DRIFT_SUFFIX = '1_xydata_particle'
 DRIFT_EXT = '.txt'
+
+LIFETIME_CUTOFF_NS = 4

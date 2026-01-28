@@ -41,7 +41,7 @@ class DataPostProcessor():
         self.avg_ph_perloc, self.avg_sbr = self.get_avg_loc_param(self.locs_filt)
         # compute and plot CRB map, superimposed with EBP
         self.calc_crb(self.avg_ph_perloc, self.avg_sbr)
-        self.plot_crb_andebp()
+        #self.plot_crb_andebp()
         # recenter localizations
         self.locs_centered = self.center_locs(self.locs_filt)
         # get range for future plots
@@ -330,7 +330,7 @@ class DataPostProcessor():
         plt.figure('Lifetime-encoded localizations')
         for beam_idx, min_pos in enumerate(self.ebp.pos_mins_centered_nm):
             plt.scatter(*min_pos, color=self.ebp.psf_colors[beam_idx], s=100)
-        plt.scatter(locs[:, 1], locs[:, 2], c=(locs[:, 5]), cmap='rainbow', vmin=0, vmax=5, s=20, alpha=0.05)
+        plt.scatter(locs[:, 1], locs[:, 2], c=(locs[:, 5]), cmap='rainbow', vmin=1.5, vmax=2.2, s=20, alpha=0.05)
         color_bar = plt.colorbar(label="Lifetime [ns]", orientation="vertical")
         color_bar.solids.set(alpha=1)
         plt.xlim(self.x_plot_range)
