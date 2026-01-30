@@ -54,13 +54,13 @@ from tracking_analysis.endoivanalysis import EndoIVAnalysis
 
 plt.close('all')
 
-date = '20260123'
+date = '20260129'
 
-meas_name = 'g1_APPTO45_mol3'
+meas_name = 'g1_mol3'
 channel_name = 'red'
-meas_number = 0
+meas_number = 2
 
-ebp_number = 4
+ebp_number = 2
 color = 'r'
 
 if meas_number==0:

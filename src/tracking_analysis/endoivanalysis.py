@@ -6,24 +6,39 @@ from pathlib import Path
 from hmmlearn.hmm import GaussianHMM
 from sklearn.mixture import GaussianMixture
 
-
 from tracking_analysis.postprocessing import DataPostProcessor
+
+D0_ATTO643_NM = 18.5
+TAU0_ATTO643_NS = 3.9
 
 class EndoIVAnalysis():
     def __init__(self, post_proc_data: DataPostProcessor, locs_filepath: Path, tcspc_data_dir: Path):
         self.post_proc_data = post_proc_data
         self.locs_filepath = locs_filepath
         self.tcspc_data_dir = tcspc_data_dir
+        self.how_many_states = self.ask_how_many_states()
         self.x_plot_range, self.y_plot_range = self.post_proc_data.get_glob_plots_limits(self.post_proc_data.locs_centered)
-        self.center_of_locs, self.locs_zeroavg = self.recenter_locs(self.post_proc_data.locs_centered)
-        self.fit_andplot_locaxis(self.post_proc_data.locs_centered)
-        self.locs_zeroavg_rotated = self.rotate_locs(self.locs_zeroavg, self.axis_slope)
-        self.plot_loc_trace(self.locs_zeroavg_rotated)
-        self.hidden_states, self.hidden_states_rescaled = self.hmm_fit_lt(self.locs_zeroavg_rotated)
-        self.get_jump_bins(self.locs_zeroavg_rotated, self.hidden_states)
-        self.plot_locs_bystate(self.locs_zeroavg_rotated, self.hidden_states)
-        self.locs_hmmfilt = self.hmm_filter(self.post_proc_data.locs_centered, self.hidden_states)
-        self.calc_state_avg_pos()
+        self.hidden_states, self.hidden_states_rescaled = self.hmm_fit_lt(self.post_proc_data.locs_centered)
+        self.get_jump_bins(self.post_proc_data.locs_centered, self.hidden_states)
+        #self.locs_hmmfilt = self.hmm_filter(self.post_proc_data.locs_centered, self.hidden_states)
+        self.locs_3d = self.calc_height(self.post_proc_data.locs_centered)
+        if self.how_many_states==2:
+            self.plot_3d_2states(self.locs_3d, self.hidden_states)
+        elif self.how_many_states==3:
+            self.plot_3d_3states(self.locs_3d, self.hidden_states)
+
+    def ask_how_many_states(self):
+        
+        how_many_states_str = input("How many lifetime states are present?")
+        match how_many_states_str:
+            case "1":
+                print("No dynamics observed")
+                how_many_states = 1
+            case "2":
+                how_many_states = 2
+            case "3":
+                how_many_states = 3
+        return how_many_states
 
     def recenter_locs(self, locs):
         """
@@ -34,67 +49,14 @@ class EndoIVAnalysis():
         locs_recenter[:, 1] -= center_of_locs[0]
         locs_recenter[:, 2] -= center_of_locs[1]
         return center_of_locs, locs_recenter
-
-    def fit_andplot_locaxis(self, locs):
-        """
-        This function performs gets the axis of the clock origami
-        """
-        # now perform Singular Value Decomposition analysis to find axis
-        _, _, Vt = np.linalg.svd(self.locs_zeroavg[:, 1:3])
-        main_axis = Vt[0]
-        self.axis_slope = main_axis[1] / main_axis[0]
-        axis_x = np.linspace(self.x_plot_range[0], self.x_plot_range[1], 100)
-        axis_y = (axis_x - self.center_of_locs[0]) * self.axis_slope + self.center_of_locs[1]
-        plt.figure('Clock axis plot')
-        for beam_idx, min_pos in enumerate(self.post_proc_data.ebp.pos_mins_centered_nm):
-            plt.scatter(*min_pos, color=self.post_proc_data.ebp.psf_colors[beam_idx], s=100)
-        plt.scatter(locs[:, 1], locs[:, 2], c='gray', s=20, alpha=0.05)
-        plt.plot(axis_x, axis_y, c='red', linestyle='--', linewidth=2)
-        plt.xlim(self.x_plot_range)
-        plt.ylim(self.y_plot_range)
-        # Annotations
-        plt.gca().set_aspect('equal'), plt.xlabel('x (nm)'), plt.ylabel('y (nm)'), plt.tight_layout()
-        plt.show()
-        
-    def rotate_locs(self, locs, axis_slope):
-        """
-        This function returns the localizations in a new system of reference rotated accoridng to a given new x axis
-        """
-        self.rot_angle = np.arctan(axis_slope)
-        rotated_locs = deepcopy(locs)
-        rotated_locs[:, 1] = locs[:, 1] * np.cos(self.rot_angle) + locs[:, 2] * np.sin(self.rot_angle)
-        rotated_locs[:, 2] = - locs[:, 1] * np.sin(self.rot_angle) + locs[:, 2] * np.cos(self.rot_angle)
-        return rotated_locs
-    
-    def plot_loc_trace(self, locs):
-        """
-        This function 
-        """
-        plt.figure("Localizations x time trace")
-        plt.plot(locs[:, 0], locs[:, 1], label='x (nm)')
-        plt.xlabel('Time (s)')
-        plt.ylabel('Localizations (nm)')
-        plt.title('')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-        
-        plt.figure("Localizations y time trace")
-        plt.plot(locs[:, 0], locs[:, 2], label='y (nm)')
-        plt.xlabel('Time (s)')
-        plt.ylabel('Localizations (nm)')
-        plt.title('')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
         
     def get_jump_bins(self, locs, hidden_states):
         """
         This function extracts the average binding times from the HMM analysis
         """
         self.jumps_bins = locs[:, 0][:-1][np.logical_or(
-            np.isclose(np.diff(hidden_states), 1, atol=1e-2),
-            np.isclose(np.diff(hidden_states), -1, atol=1e-2)
+            np.isclose(np.abs(np.diff(hidden_states)), 1, atol=1e-2),
+            np.isclose(np.abs(np.diff(hidden_states)), 2, atol=1e-2),
         )]
         print(f"Average time between jumps: {np.mean(np.diff(self.jumps_bins))} s")
 
@@ -102,7 +64,7 @@ class EndoIVAnalysis():
         """
         This function implements a basic HMM fit of the lifetime trace and plots the rescaled prediciton for the hidden states
         """
-        model = GaussianHMM(n_components=2, covariance_type="diag", n_iter=1000)
+        model = GaussianHMM(n_components=self.how_many_states, covariance_type="diag", n_iter=1000)
         model.fit(locs[:, 5].reshape(-1, 1))
         hidden_states = model.predict(locs[:, 5].reshape(-1, 1))
         locs_statezero = locs[hidden_states == 0]
@@ -143,6 +105,16 @@ class EndoIVAnalysis():
         self.locs_hmmfilts_filepath = self.tcspc_data_dir / self.locs_hmmfilts_filename
         np.save(self.locs_hmmfilts_filepath, locs_hmmfilt)
         return locs_hmmfilt
+
+    def height_fromget(self, tau, dist_halfquench, tau_unquench):
+        return dist_halfquench*(tau_unquench/tau - 1)**(-1/4)  
+
+    def calc_height(self, locs):
+        height_arr = self.height_fromget(locs[:,5], D0_ATTO643_NM, TAU0_ATTO643_NS)
+        return np.concatenate((
+                locs,
+                height_arr.reshape(-1,1),
+            ), axis=1)
         
     def plot_locs_bystate(self, locs, hidden_states):
         state_zero_mask = np.isclose(hidden_states, 0)
@@ -151,10 +123,34 @@ class EndoIVAnalysis():
         plt.scatter(locs[state_one_mask, 0], locs[state_one_mask, 1], color="red")
         plt.show()
         
-    def calc_state_avg_pos(self):
-        """
-        This function fits the positions between jumps
-        """
+    def plot_3d_2states(self, locs, hidden_states):
         pass
+    
+    def plot_3d_3states(self, locs, hidden_states):
+        state_zero_mask = np.isclose(hidden_states, 0)
+        state_one_mask = np.isclose(hidden_states, 1)
+        state_two_mask = np.isclose(hidden_states, 2)
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        ax.scatter(locs[state_zero_mask, 1], locs[state_zero_mask, 2], locs[state_zero_mask, 6], color='blue', s=50, alpha=0.4)
+        ax.scatter(locs[state_one_mask, 1], locs[state_one_mask, 2], locs[state_one_mask, 6], color='green', s=50, alpha=0.4)
+        ax.scatter(locs[state_two_mask, 1], locs[state_two_mask, 2], locs[state_two_mask, 6], color='red', s=50, alpha=0.4)
+        ax.set_box_aspect([
+            np.ptp(np.concatenate((locs[state_zero_mask, 1], locs[state_one_mask, 1], locs[state_two_mask, 1]))),
+            np.ptp(np.concatenate((locs[state_zero_mask, 2], locs[state_one_mask, 2], locs[state_two_mask, 2]))),
+            np.ptp(np.concatenate((locs[state_zero_mask, 6], locs[state_one_mask, 6], locs[state_two_mask, 6])))
+        ])
+
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        plt.show()
+        
+        
+        
+        plt.show()
         
         
