@@ -2,30 +2,86 @@ from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+from iminuit import Minuit
 
 from hmmlearn.hmm import GaussianHMM
 from sklearn.mixture import GaussianMixture
 
 from tracking_analysis.postprocessing import DataPostProcessor
+from tracking_analysis.config.configvar import HMM_WLT_SUFFIX
 
 D0_ATTO643_NM = 18.5
 TAU0_ATTO643_NS = 3.9
+ARM_LENGTH = 4.3
+KINK_Z_NM = 15
+KINK_Z_SIGMA_NM = 1
+TOTAL_DNA_LENGTH_NM = 19.3
+TOTAL_DNA_LENGTH_SIGMA_NM = 0.7
+
+def kink_localizer(coord_down, coord_up, z_kink):
+    
+    #check whether points are not too far from kink plane
+    if ((np.abs(coord_down[2] - z_kink) > ARM_LENGTH) or (np.abs(coord_up[2] - z_kink) > ARM_LENGTH)):
+        x_kink = None
+        y_kink = None
+        
+    else:
+        #compute projections of radii on kink plane
+        radius_down_proj = np.sqrt(ARM_LENGTH**2 - (coord_down[2] - z_kink)**2)
+        radius_up_proj = np.sqrt(ARM_LENGTH**2 - (coord_up[2] - z_kink)**2)
+        #project coords on kink plane
+        coord_down_proj = coord_down[:2]
+        coord_up_proj = coord_up[:2]
+        #compute distance of localizations on kink plane
+        loc_dist_proj = np.linalg.norm(coord_down_proj - coord_up_proj)
+        
+        #check whether circumferences intersect on kink plane
+        if (((radius_down_proj + radius_up_proj) < loc_dist_proj)
+                        or (loc_dist_proj + min(radius_down_proj, radius_up_proj) < max(radius_down_proj, radius_up_proj))):
+            x_kink = None
+            y_kink = None
+            
+        else:
+            #define versors
+            parall_versor = (coord_up_proj - coord_down_proj)
+            parall_versor = parall_versor/np.linalg.norm(parall_versor)
+            perp_versor = np.array([parall_versor[1], -parall_versor[0]])
+            
+            #distance between down localization and axis of intersection
+            dist_parall = (loc_dist_proj**2 + radius_down_proj**2 - radius_up_proj**2)/(2*loc_dist_proj)
+            #half of the chord between intersections
+            dist_perp = np.sqrt(radius_down_proj**2 - dist_parall**2)
+            
+            if perp_versor[0]>0:
+                coord_kink_proj = coord_down_proj + dist_parall*parall_versor + dist_perp*perp_versor
+            else:
+                coord_kink_proj = coord_down_proj + dist_parall*parall_versor - dist_perp*perp_versor
+            
+            x_kink = coord_kink_proj[0]
+            y_kink = coord_kink_proj[1]
+        
+        
+    return x_kink, y_kink             
 
 class EndoIVAnalysis():
-    def __init__(self, post_proc_data: DataPostProcessor, locs_filepath: Path, tcspc_data_dir: Path):
+    def __init__(self, post_proc_data: DataPostProcessor, locs_filepath: Path, tcspc_data_dir: Path, hmm_filt_done: bool):
         self.post_proc_data = post_proc_data
         self.locs_filepath = locs_filepath
         self.tcspc_data_dir = tcspc_data_dir
+        self.hmm_filt_done = hmm_filt_done
         self.how_many_states = self.ask_how_many_states()
-        self.x_plot_range, self.y_plot_range = self.post_proc_data.get_glob_plots_limits(self.post_proc_data.locs_centered)
-        self.hidden_states, self.hidden_states_rescaled = self.hmm_fit_lt(self.post_proc_data.locs_centered)
-        self.get_jump_bins(self.post_proc_data.locs_centered, self.hidden_states)
-        #self.locs_hmmfilt = self.hmm_filter(self.post_proc_data.locs_centered, self.hidden_states)
-        self.locs_3d = self.calc_height(self.post_proc_data.locs_centered)
+        if hmm_filt_done:
+            self.locs_hmmfilt = self.load_locs(self.locs_filepath)
+        else:
+            self.hidden_states, self.hidden_states_rescaled = self.hmm_fit_lt(self.post_proc_data.locs_centered)
+            #self.get_jump_bins(self.post_proc_data.locs_centered, self.hidden_states)
+            self.locs_hmmfilt = self.hmm_filter(self.post_proc_data.locs_centered, self.hidden_states)
+        self.locs_3d = self.calc_height(self.locs_hmmfilt)
         if self.how_many_states==2:
-            self.plot_3d_2states(self.locs_3d, self.hidden_states)
+            self.plot_3d_2states(self.locs_3d)
         elif self.how_many_states==3:
-            self.plot_3d_3states(self.locs_3d, self.hidden_states)
+            self.plot_3d_3states(self.locs_3d)
+            self.fitandplot_gauss3d_3states(self.locs_3d)
 
     def ask_how_many_states(self):
         
@@ -39,6 +95,16 @@ class EndoIVAnalysis():
             case "3":
                 how_many_states = 3
         return how_many_states
+
+    def load_locs(self, locs_filepath):
+        """
+        This function loads the localization array saved as a .npy
+        """
+        locs = np.load(locs_filepath)
+        self.avg_ph_perloc = np.mean(locs[:,3])
+        self.sigma_ph_perloc = np.std(locs[:,3])
+        print(f"Average number of photons per localization: {self.avg_ph_perloc} \u00B1 {self.sigma_ph_perloc}")
+        return locs
 
     def recenter_locs(self, locs):
         """
@@ -91,7 +157,11 @@ class EndoIVAnalysis():
         localizations right before and right after a jump
         """
         locs_beforefilt = len(locs)
-        locs_hmmfilt = locs[:-1][
+        locs_hmmfilt = np.concatenate((
+                locs,
+                hidden_states.reshape(-1,1),
+            ), axis=1)
+        locs_hmmfilt = locs_hmmfilt[:-1][
             np.logical_and(
                 np.isclose(np.diff(hidden_states), 0, atol=1e-2),
                 np.isclose(np.diff(np.concatenate([hidden_states[:1], hidden_states[:-1]])), 0, atol=1e-6)
@@ -101,7 +171,7 @@ class EndoIVAnalysis():
         print(f"HMM filtering discarded {locs_beforefilt - locs_afterfilt} localizations")
         print(f"{locs_afterfilt} localizations remaining ({int(locs_afterfilt / locs_beforefilt * 100)}%)")
         
-        self.locs_hmmfilts_filename = self.locs_filepath.stem + '_HMMfilt_withlifetime.npy'
+        self.locs_hmmfilts_filename = self.locs_filepath.stem + '_' + HMM_WLT_SUFFIX +'.npy'
         self.locs_hmmfilts_filepath = self.tcspc_data_dir / self.locs_hmmfilts_filename
         np.save(self.locs_hmmfilts_filepath, locs_hmmfilt)
         return locs_hmmfilt
@@ -123,24 +193,42 @@ class EndoIVAnalysis():
         plt.scatter(locs[state_one_mask, 0], locs[state_one_mask, 1], color="red")
         plt.show()
         
-    def plot_3d_2states(self, locs, hidden_states):
-        pass
-    
-    def plot_3d_3states(self, locs, hidden_states):
-        state_zero_mask = np.isclose(hidden_states, 0)
-        state_one_mask = np.isclose(hidden_states, 1)
-        state_two_mask = np.isclose(hidden_states, 2)
+    def plot_3d_2states(self, locs):
+        state_zero_mask = np.isclose(locs[:, 6], 0)
+        state_one_mask = np.isclose(locs[:, 6], 1)
         
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        ax.scatter(locs[state_zero_mask, 1], locs[state_zero_mask, 2], locs[state_zero_mask, 6], color='blue', s=50, alpha=0.4)
-        ax.scatter(locs[state_one_mask, 1], locs[state_one_mask, 2], locs[state_one_mask, 6], color='green', s=50, alpha=0.4)
-        ax.scatter(locs[state_two_mask, 1], locs[state_two_mask, 2], locs[state_two_mask, 6], color='red', s=50, alpha=0.4)
+        ax.scatter(locs[state_zero_mask, 1], locs[state_zero_mask, 2], locs[state_zero_mask, 7], color='blue', s=50, alpha=0.4)
+        ax.scatter(locs[state_one_mask, 1], locs[state_one_mask, 2], locs[state_one_mask, 7], color='green', s=50, alpha=0.4)
+        ax.set_box_aspect([
+            np.ptp(np.concatenate((locs[state_zero_mask, 1], locs[state_one_mask, 1]))),
+            np.ptp(np.concatenate((locs[state_zero_mask, 2], locs[state_one_mask, 2]))),
+            np.ptp(np.concatenate((locs[state_zero_mask, 7], locs[state_one_mask, 7])))
+        ])
+
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        plt.show()
+    
+    def plot_3d_3states(self, locs):
+        state_zero_mask = np.isclose(locs[:, 6], 0)
+        state_one_mask = np.isclose(locs[:, 6], 1)
+        state_two_mask = np.isclose(locs[:, 6], 2)
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        ax.scatter(locs[state_zero_mask, 1], locs[state_zero_mask, 2], locs[state_zero_mask, 7], color='blue', s=50, alpha=0.4)
+        ax.scatter(locs[state_one_mask, 1], locs[state_one_mask, 2], locs[state_one_mask, 7], color='green', s=50, alpha=0.4)
+        ax.scatter(locs[state_two_mask, 1], locs[state_two_mask, 2], locs[state_two_mask, 7], color='red', s=50, alpha=0.4)
         ax.set_box_aspect([
             np.ptp(np.concatenate((locs[state_zero_mask, 1], locs[state_one_mask, 1], locs[state_two_mask, 1]))),
             np.ptp(np.concatenate((locs[state_zero_mask, 2], locs[state_one_mask, 2], locs[state_two_mask, 2]))),
-            np.ptp(np.concatenate((locs[state_zero_mask, 6], locs[state_one_mask, 6], locs[state_two_mask, 6])))
+            np.ptp(np.concatenate((locs[state_zero_mask, 7], locs[state_one_mask, 7], locs[state_two_mask, 7])))
         ])
 
         ax.set_xlabel('X')
@@ -149,8 +237,147 @@ class EndoIVAnalysis():
 
         plt.show()
         
+    def fitandplot_gauss3d_3states(self, locs):
+        state_zero_mask = np.isclose(locs[:, 6], 0)
+        state_one_mask = np.isclose(locs[:, 6], 1)
+        state_two_mask = np.isclose(locs[:, 6], 2)
         
+        gmm_state0 = GaussianMixture(n_components=1, covariance_type='full')
+        gmm_state0.fit(locs[state_zero_mask][:, [1, 2, 7]])  # Fit on (x, y, z) coordinates
+
+        # Extract means and covariances
+        self.means_0 = gmm_state0.means_
+        self.covariances_0 = gmm_state0.covariances_
         
+        gmm_state1 = GaussianMixture(n_components=1, covariance_type='full')
+        gmm_state1.fit(locs[state_one_mask][:, [1, 2, 7]])  # Fit on (x, y, z) coordinates
+
+        # Extract means and covariances
+        self.means_1 = gmm_state1.means_
+        self.covariances_1 = gmm_state1.covariances_
+
+        gmm_state2 = GaussianMixture(n_components=1, covariance_type='full')
+        gmm_state2.fit(locs[state_two_mask][:, [1, 2, 7]])  # Fit on (x, y, z) coordinates
+
+        # Extract means and covariances
+        self.means_2 = gmm_state2.means_
+        self.covariances_2 = gmm_state2.covariances_
+        
+        self.x_kink_01, self.y_kink_01 = kink_localizer(self.means_0[0], self.means_1[0], KINK_Z_NM)
+        self.x_kink_02, self.y_kink_02 = kink_localizer(self.means_0[0], self.means_2[0], KINK_Z_NM)
+        self.x_kink_12, self.y_kink_12 = kink_localizer(self.means_1[0], self.means_2[0], KINK_Z_NM)
+        
+        sigmas_0 = np.sqrt(np.array(np.diag(self.covariances_0[0])))
+        sigmas_1 = np.sqrt(np.array(np.diag(self.covariances_1[0])))
+        sigmas_2 = np.sqrt(np.array(np.diag(self.covariances_2[0])))
+        print(sigmas_0)
+        print(sigmas_1)
+        print(sigmas_2)
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        ax.scatter(self.means_0[0][0], self.means_0[0][1], self.means_0[0][2], color='blue', s=50, alpha=0.4)
+        ax.scatter(self.means_1[0][0], self.means_1[0][1], self.means_1[0][2], color='green', s=50, alpha=0.4)
+        ax.scatter(self.means_2[0][0], self.means_2[0][1], self.means_2[0][2], color='red', s=50, alpha=0.4)
+        ax.scatter(self.x_kink_01, self.y_kink_01, KINK_Z_NM, color='black', s=50, alpha=0.4, marker='o')
+        ax.scatter(self.x_kink_02, self.y_kink_02, KINK_Z_NM, color='black', s=50, alpha=0.4, marker='s')
+        ax.scatter(self.x_kink_12, self.y_kink_12, KINK_Z_NM, color='black', s=50, alpha=0.4, marker='^')
+        
+        ax.set_box_aspect([
+            np.ptp(np.concatenate((locs[state_zero_mask, 1], locs[state_one_mask, 1], locs[state_two_mask, 1]))),
+            np.ptp(np.concatenate((locs[state_zero_mask, 2], locs[state_one_mask, 2], locs[state_two_mask, 2]))),
+            np.ptp(np.concatenate((locs[state_zero_mask, 7], locs[state_one_mask, 7], locs[state_two_mask, 7])))
+        ])
+
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
         plt.show()
+        
+    def calc_guess_3states_analysis(self):
+        '''
+        This function calculates guesses for the maximum likelihood analysis in the case of a 3 state trace
+        '''
+        guess_dict = {
+            'x_kink': np.mean((self.x_kink_01, self.x_kink_02, self.x_kink_12)),
+            'y_kink': np.mean((self.y_kink_01, self.y_kink_02, self.y_kink_12)),
+            'z_kink': KINK_Z_NM,
+            'dna_length': TOTAL_DNA_LENGTH_NM,
+            'x_c0': self.means_0[0][0],
+            'y_c0': self.means_0[0][1],
+            'z_c0': self.means_0[0][2],
+            'cov_c0_xx': self.covariances_0[0][0,0],
+            'cov_c0_yy': self.covariances_0[0][1,1],
+            'cov_c0_xy': self.covariances_0[0][0,1],
+            'cov_c0_zz': self.covariances_0[0][2,2],
+            'x_c1': self.means_1[0][0],
+            'y_c1': self.means_1[0][1],
+            'z_c1': self.means_1[0][2],
+            'cov_c1_xx': self.covariances_1[0][0,0],
+            'cov_c1_yy': self.covariances_1[0][1,1],
+            'cov_c1_xy': self.covariances_1[0][0,1],
+            'cov_c1_zz': self.covariances_1[0][2,2],
+            'x_c2': self.means_2[0][0],
+            'y_c2': self.means_2[0][1],
+            'z_c2': self.means_2[0][2],
+            'cov_c2_xx': self.covariances_2[0][0,0],
+            'cov_c2_yy': self.covariances_2[0][1,1],
+            'cov_c2_xy': self.covariances_2[0][0,1],
+            'cov_c2_zz': self.covariances_2[0][2,2],
+        }
+        
+    
+    def calc_cost_3states_analysis(
+        self,
+        x_kink,
+        y_kink,
+        z_kink,
+        dna_length,
+        x_c0,
+        y_c0,
+        z_c0,
+        cov_c0_xx,
+        cov_c0_yy,
+        cov_c0_xy,
+        cov_c0_zz,
+        x_c1,
+        y_c1,
+        z_c1,
+        cov_c1_xx,
+        cov_c1_yy,
+        cov_c1_xy,
+        cov_c1_zz,
+        x_c2,
+        y_c2,
+        z_c2,
+        cov_c2_xx,
+        cov_c2_yy,
+        cov_c2_xy,
+        cov_c2_zz,
+    ):
+        det_cov_c0 = cov_c0_xx*cov_c0_yy - cov_c0_xy**2
+        det_cov_c1 = cov_c1_xx*cov_c1_yy - cov_c1_xy**2
+        det_cov_c2 = cov_c2_xx*cov_c2_yy - cov_c2_xy**2
+            
+        cost = 0
+        for loc_idx in range(len(self.locs_3d)):
+            if np.isclose(self.locs_3d[:, 6], 0):
+                
+            if np.isclose(self.locs_3d[:, 6], 1):
+                
+            if np.isclose(self.locs_3d[:, 6], 2):    
+        
+        return cost
+    
+    def find_kink_3states(self, locs_3d):
+        '''
+        This function finds the most likely position of the kink in 3d for a trace with 3 states, using the maximum likelihood method.
+        '''
+        fit_params_w_guess = self.calc_guess_3states_analysis()
+        minuit = Minuit(self.calc_cost_3states_analysis, grad=None, **fit_params_w_guess)
+        minuit.errordef = Minuit.LIKELIHOOD
+        minuit.migrad()
         
         

@@ -43,7 +43,8 @@ from tracking_analysis.config.configvar import (
     DRIFT_SUFFIX,
     DRIFT_EXT,
     EBP_DIR_SUFFIX,
-    PSF_FIT_DIR_NAME
+    PSF_FIT_DIR_NAME,
+    HMM_WLT_SUFFIX
 )
 from tracking_analysis.ebp import EBP
 from tracking_analysis.tcspcdata import TCSPCData
@@ -133,12 +134,19 @@ if __name__ == "__main__":
         locs_filepath_list.append(minflux_analysis.locs_results_filepath)
         result_filenumber_chosen = -1
     locs_dens_hist_bin_size = 1
-    use_drift_data_choice_input = input("Do you want to use drift data for a posteriori correction? (y/n) ")
+    #use_drift_data_choice_input = input("Do you want to use drift data for a posteriori correction? (y/n) ")
+    use_drift_data_choice_input = 'n'
     if use_drift_data_choice_input == 'y':
         use_drift_data_choice = True
     else:
         use_drift_data_choice = False
-    postproc = DataPostProcessor(locs_filepath_list[result_filenumber_chosen], drift_filepath_list, ebp, locs_dens_hist_bin_size, use_drift_data_choice, do_lifetime_fit)
+    locs_filepath = locs_filepath_list[result_filenumber_chosen]
+    if HMM_WLT_SUFFIX not in locs_filepath.name:
+        postproc = DataPostProcessor(locs_filepath, drift_filepath_list, ebp, locs_dens_hist_bin_size, use_drift_data_choice, do_lifetime_fit)
+        hmm_filt_done = False
+    else:
+        postproc = None
+        hmm_filt_done = True
     print("""Do you want to perform additional analysis? Press:
 1 for single-molecule/point-emitter analysis
 2 for 2 sites clock analysis
@@ -151,7 +159,7 @@ any other key for no additional analsis""")
         case '2':
             clock_analysis = ClockOrigamiAnalysis(postproc, locs_filepath_list[result_filenumber_chosen], data_dir)
         case '3':
-            endoiv_analysis = EndoIVAnalysis(postproc, locs_filepath_list[result_filenumber_chosen], data_dir)
+            endoiv_analysis = EndoIVAnalysis(postproc, locs_filepath_list[result_filenumber_chosen], data_dir, hmm_filt_done)
         
 
 
