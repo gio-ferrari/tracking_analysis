@@ -463,6 +463,17 @@ class EndoIVAnalysis():
         )
         z_c2 = result['z_kink'] + np.sqrt((result['dna_length'] - result['z_kink'])**2 - proj_dist_state2**2)
         
+        print('Lateral sigma state 0:', np.sqrt(np.sum(np.linalg.eig([[result['cov_c0_xx'], result['cov_c0_xy']], [result['cov_c0_xy'], result['cov_c0_yy']]])[0])/2))
+        print('Lateral sigma state 0 (simplified):', np.sqrt((result['cov_c0_xx'] + result['cov_c0_yy'])/2))
+        print('Axial sigma state 0:', np.sqrt(result['cov_c0_zz']))
+        print('Lateral sigma state 1:', np.sqrt(np.sum(np.linalg.eig([[result['cov_c1_xx'], result['cov_c1_xy']], [result['cov_c1_xy'], result['cov_c1_yy']]])[0])/2))
+        print('Lateral sigma state 1 (simplified):', np.sqrt((result['cov_c1_xx'] + result['cov_c1_yy'])/2))
+        print('Axial sigma state 1:', np.sqrt(result['cov_c1_zz']))
+        print('Lateral sigma state 2:', np.sqrt(np.sum(np.linalg.eig([[result['cov_c2_xx'], result['cov_c2_xy']], [result['cov_c2_xy'], result['cov_c2_yy']]])[0])/2))
+        print('Lateral sigma state 2 (simplified):', np.sqrt((result['cov_c2_xx'] + result['cov_c2_yy'])/2))
+        print('Axial sigma state 2:', np.sqrt(result['cov_c2_zz']))
+        
+        
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
@@ -474,10 +485,15 @@ class EndoIVAnalysis():
         ax.scatter(self.locs_3d[state_one_mask, 1], self.locs_3d[state_one_mask, 2], self.locs_3d[state_one_mask, 7], color='green', s=50, alpha=0.1)
         ax.scatter(self.locs_3d[state_two_mask, 1], self.locs_3d[state_two_mask, 2], self.locs_3d[state_two_mask, 7], color='red', s=50, alpha=0.1)
 
-        ax.scatter(result['x_c0'], result['y_c0'], result['z_c0'], color='blue', s=200, alpha=1, marker='*')
-        ax.scatter(result['x_c1'], result['y_c1'], result['z_c1'], color='green', s=200, alpha=1, marker='*')
-        ax.scatter(result['x_c2'], result['y_c2'], z_c2, color='red', s=200, alpha=1, marker='*')
-        ax.scatter(x_kink, y_kink, result['z_kink'], color='black', s=200, alpha=1, marker='o')
+        ax.scatter(result['x_c0'], result['y_c0'], result['z_c0'], color='blue', s=400, alpha=1, marker='*')
+        ax.scatter(result['x_c1'], result['y_c1'], result['z_c1'], color='green', s=400, alpha=1, marker='*')
+        ax.scatter(result['x_c2'], result['y_c2'], z_c2, color='red', s=400, alpha=1, marker='*')
+        ax.scatter(x_kink, y_kink, result['z_kink'], color='black', s=100, alpha=1, marker='o')
+        
+        ax.plot([x_kink, x_kink], [y_kink, y_kink], [0, result['z_kink']], lw='5', alpha=0.7, color='gray')
+        ax.plot([x_kink, result['x_c0']], [y_kink, result['y_c0']], [result['z_kink'], result['z_c0']], lw='5', alpha=0.7, color='gray')
+        ax.plot([x_kink, result['x_c1']], [y_kink, result['y_c1']], [result['z_kink'], result['z_c1']], lw='5', alpha=0.7, color='gray')
+        ax.plot([x_kink, result['x_c2']], [y_kink, result['y_c2']], [result['z_kink'], z_c2], lw='5', alpha=0.7, color='gray')
         
         ax.set_zlim([0,20])
         ax.set_box_aspect([
