@@ -12,23 +12,33 @@ from tracking_analysis.config.configvar import HMM_WLT_SUFFIX
 
 D0_ATTO643_NM = 18.5
 TAU0_ATTO643_NS = 3.9
-ARM_LENGTH = 4.3
-KINK_Z_NM = 15
-KINK_Z_SIGMA_NM = 1
-TOTAL_DNA_LENGTH_NM = 19.3
-TOTAL_DNA_LENGTH_SIGMA_NM = 0.7
+ARM_LENGTH_PRIOR_NM = 4.3
+KINK_Z_PRIOR_NM = 15
+KINK_Z_SIGMA_NM = 0.05
+TOTAL_DNA_LENGTH_PRIOR_NM = 19.3
+TOTAL_DNA_LENGTH_SIGMA_NM = 0.04
 
-def kink_localizer(coord_down, coord_up, z_kink):
+def cost_single_point(x, y, z, x0, y0, z0, cov_xx, cov_yy, cov_xy, cov_zz, det_cov):
+    delta_x = x - x0
+    delta_y = y - y0
+    delta_z = z - z0
+    
+    lateral_term = (1/2)*np.log(det_cov) + (1/2) * (1/det_cov) * (cov_yy*delta_x**2 - 2*cov_xy*delta_x*delta_y + cov_xx*delta_y**2)
+    axial_term = (1/2)*np.log(cov_zz) + (1/2)*delta_z**2/cov_zz
+    
+    return lateral_term + axial_term
+
+def kink_localizer(coord_down, coord_up, z_kink, arm_length):
     
     #check whether points are not too far from kink plane
-    if ((np.abs(coord_down[2] - z_kink) > ARM_LENGTH) or (np.abs(coord_up[2] - z_kink) > ARM_LENGTH)):
+    if ((np.abs(coord_down[2] - z_kink) > arm_length) or (np.abs(coord_up[2] - z_kink) > arm_length)):
         x_kink = None
         y_kink = None
         
     else:
         #compute projections of radii on kink plane
-        radius_down_proj = np.sqrt(ARM_LENGTH**2 - (coord_down[2] - z_kink)**2)
-        radius_up_proj = np.sqrt(ARM_LENGTH**2 - (coord_up[2] - z_kink)**2)
+        radius_down_proj = np.sqrt(arm_length**2 - (coord_down[2] - z_kink)**2)
+        radius_up_proj = np.sqrt(arm_length**2 - (coord_up[2] - z_kink)**2)
         #project coords on kink plane
         coord_down_proj = coord_down[:2]
         coord_up_proj = coord_up[:2]
@@ -82,6 +92,7 @@ class EndoIVAnalysis():
         elif self.how_many_states==3:
             self.plot_3d_3states(self.locs_3d)
             self.fitandplot_gauss3d_3states(self.locs_3d)
+            self.analysis_3states()
 
     def ask_how_many_states(self):
         
@@ -238,34 +249,34 @@ class EndoIVAnalysis():
         plt.show()
         
     def fitandplot_gauss3d_3states(self, locs):
-        state_zero_mask = np.isclose(locs[:, 6], 0)
-        state_one_mask = np.isclose(locs[:, 6], 1)
-        state_two_mask = np.isclose(locs[:, 6], 2)
+        self.state_zero_mask = np.isclose(locs[:, 6], 0)
+        self.state_one_mask = np.isclose(locs[:, 6], 1)
+        self.state_two_mask = np.isclose(locs[:, 6], 2)
         
         gmm_state0 = GaussianMixture(n_components=1, covariance_type='full')
-        gmm_state0.fit(locs[state_zero_mask][:, [1, 2, 7]])  # Fit on (x, y, z) coordinates
+        gmm_state0.fit(locs[self.state_zero_mask][:, [1, 2, 7]])  # Fit on (x, y, z) coordinates
 
         # Extract means and covariances
         self.means_0 = gmm_state0.means_
         self.covariances_0 = gmm_state0.covariances_
         
         gmm_state1 = GaussianMixture(n_components=1, covariance_type='full')
-        gmm_state1.fit(locs[state_one_mask][:, [1, 2, 7]])  # Fit on (x, y, z) coordinates
+        gmm_state1.fit(locs[self.state_one_mask][:, [1, 2, 7]])  # Fit on (x, y, z) coordinates
 
         # Extract means and covariances
         self.means_1 = gmm_state1.means_
         self.covariances_1 = gmm_state1.covariances_
 
         gmm_state2 = GaussianMixture(n_components=1, covariance_type='full')
-        gmm_state2.fit(locs[state_two_mask][:, [1, 2, 7]])  # Fit on (x, y, z) coordinates
+        gmm_state2.fit(locs[self.state_two_mask][:, [1, 2, 7]])  # Fit on (x, y, z) coordinates
 
         # Extract means and covariances
         self.means_2 = gmm_state2.means_
         self.covariances_2 = gmm_state2.covariances_
         
-        self.x_kink_01, self.y_kink_01 = kink_localizer(self.means_0[0], self.means_1[0], KINK_Z_NM)
-        self.x_kink_02, self.y_kink_02 = kink_localizer(self.means_0[0], self.means_2[0], KINK_Z_NM)
-        self.x_kink_12, self.y_kink_12 = kink_localizer(self.means_1[0], self.means_2[0], KINK_Z_NM)
+        self.x_kink_01, self.y_kink_01 = kink_localizer(self.means_0[0], self.means_1[0], KINK_Z_PRIOR_NM, ARM_LENGTH_PRIOR_NM)
+        self.x_kink_02, self.y_kink_02 = kink_localizer(self.means_0[0], self.means_2[0], KINK_Z_PRIOR_NM, ARM_LENGTH_PRIOR_NM)
+        self.x_kink_12, self.y_kink_12 = kink_localizer(self.means_1[0], self.means_2[0], KINK_Z_PRIOR_NM, ARM_LENGTH_PRIOR_NM)
         
         sigmas_0 = np.sqrt(np.array(np.diag(self.covariances_0[0])))
         sigmas_1 = np.sqrt(np.array(np.diag(self.covariances_1[0])))
@@ -280,14 +291,14 @@ class EndoIVAnalysis():
         ax.scatter(self.means_0[0][0], self.means_0[0][1], self.means_0[0][2], color='blue', s=50, alpha=0.4)
         ax.scatter(self.means_1[0][0], self.means_1[0][1], self.means_1[0][2], color='green', s=50, alpha=0.4)
         ax.scatter(self.means_2[0][0], self.means_2[0][1], self.means_2[0][2], color='red', s=50, alpha=0.4)
-        ax.scatter(self.x_kink_01, self.y_kink_01, KINK_Z_NM, color='black', s=50, alpha=0.4, marker='o')
-        ax.scatter(self.x_kink_02, self.y_kink_02, KINK_Z_NM, color='black', s=50, alpha=0.4, marker='s')
-        ax.scatter(self.x_kink_12, self.y_kink_12, KINK_Z_NM, color='black', s=50, alpha=0.4, marker='^')
+        ax.scatter(self.x_kink_01, self.y_kink_01, KINK_Z_PRIOR_NM, color='black', s=50, alpha=0.4, marker='o')
+        ax.scatter(self.x_kink_02, self.y_kink_02, KINK_Z_PRIOR_NM, color='black', s=50, alpha=0.4, marker='s')
+        ax.scatter(self.x_kink_12, self.y_kink_12, KINK_Z_PRIOR_NM, color='black', s=50, alpha=0.4, marker='^')
         
         ax.set_box_aspect([
-            np.ptp(np.concatenate((locs[state_zero_mask, 1], locs[state_one_mask, 1], locs[state_two_mask, 1]))),
-            np.ptp(np.concatenate((locs[state_zero_mask, 2], locs[state_one_mask, 2], locs[state_two_mask, 2]))),
-            np.ptp(np.concatenate((locs[state_zero_mask, 7], locs[state_one_mask, 7], locs[state_two_mask, 7])))
+            np.ptp(np.concatenate((locs[self.state_zero_mask, 1], locs[self.state_one_mask, 1], locs[self.state_two_mask, 1]))),
+            np.ptp(np.concatenate((locs[self.state_zero_mask, 2], locs[self.state_one_mask, 2], locs[self.state_two_mask, 2]))),
+            np.ptp(np.concatenate((locs[self.state_zero_mask, 7], locs[self.state_one_mask, 7], locs[self.state_two_mask, 7])))
         ])
 
         ax.set_xlabel('X')
@@ -301,10 +312,8 @@ class EndoIVAnalysis():
         This function calculates guesses for the maximum likelihood analysis in the case of a 3 state trace
         '''
         guess_dict = {
-            'x_kink': np.mean((self.x_kink_01, self.x_kink_02, self.x_kink_12)),
-            'y_kink': np.mean((self.y_kink_01, self.y_kink_02, self.y_kink_12)),
-            'z_kink': KINK_Z_NM,
-            'dna_length': TOTAL_DNA_LENGTH_NM,
+            'z_kink': KINK_Z_PRIOR_NM,
+            'dna_length': TOTAL_DNA_LENGTH_PRIOR_NM,
             'x_c0': self.means_0[0][0],
             'y_c0': self.means_0[0][1],
             'z_c0': self.means_0[0][2],
@@ -321,18 +330,15 @@ class EndoIVAnalysis():
             'cov_c1_zz': self.covariances_1[0][2,2],
             'x_c2': self.means_2[0][0],
             'y_c2': self.means_2[0][1],
-            'z_c2': self.means_2[0][2],
             'cov_c2_xx': self.covariances_2[0][0,0],
             'cov_c2_yy': self.covariances_2[0][1,1],
             'cov_c2_xy': self.covariances_2[0][0,1],
             'cov_c2_zz': self.covariances_2[0][2,2],
         }
-        
+        return guess_dict
     
     def calc_cost_3states_analysis(
         self,
-        x_kink,
-        y_kink,
         z_kink,
         dna_length,
         x_c0,
@@ -351,27 +357,89 @@ class EndoIVAnalysis():
         cov_c1_zz,
         x_c2,
         y_c2,
-        z_c2,
         cov_c2_xx,
         cov_c2_yy,
         cov_c2_xy,
         cov_c2_zz,
     ):
+        # computing determinant of covariance matrices
         det_cov_c0 = cov_c0_xx*cov_c0_yy - cov_c0_xy**2
         det_cov_c1 = cov_c1_xx*cov_c1_yy - cov_c1_xy**2
         det_cov_c2 = cov_c2_xx*cov_c2_yy - cov_c2_xy**2
             
+        # length of the upper arm (i.e. radius of the circumference)
+        arm_length = dna_length - z_kink
+            
+        # fixing kink position based on first two states
+        x_kink, y_kink = kink_localizer(
+            np.array((x_c0, y_c0, z_c0)),
+            np.array((x_c1, y_c1, z_c1)),
+            z_kink,
+            arm_length
+        )
+        if (x_kink is None) or (y_kink is None):
+            return np.inf
+        
+        #computing z of the third state
+        proj_dist_state2 = np.sqrt(
+            (x_c2 - x_kink)**2 + (y_c2 - y_kink)**2
+        )
+        # state 2 is too far for this arm length: discard
+        if proj_dist_state2>arm_length:
+            return np.inf
+        else:
+            z_c2 = z_kink + np.sqrt(arm_length**2 - proj_dist_state2**2)
+            
         cost = 0
-        for loc_idx in range(len(self.locs_3d)):
-            if np.isclose(self.locs_3d[:, 6], 0):
-                
-            if np.isclose(self.locs_3d[:, 6], 1):
-                
-            if np.isclose(self.locs_3d[:, 6], 2):    
+
+        cost += np.sum(cost_single_point(
+            self.locs_3d[self.state_zero_mask, 1],
+            self.locs_3d[self.state_zero_mask, 2],
+            self.locs_3d[self.state_zero_mask, 7],
+            x_c0,
+            y_c0,
+            z_c0,
+            cov_c0_xx,
+            cov_c0_yy,
+            cov_c0_xy,
+            cov_c0_zz,
+            det_cov_c0
+        ))
+
+        cost += np.sum(cost_single_point(
+            self.locs_3d[self.state_one_mask, 1],
+            self.locs_3d[self.state_one_mask, 2],
+            self.locs_3d[self.state_one_mask, 7],
+            x_c1,
+            y_c1,
+            z_c1,
+            cov_c1_xx,
+            cov_c1_yy,
+            cov_c1_xy,
+            cov_c1_zz,
+            det_cov_c1
+        ))
+
+        cost += np.sum(cost_single_point(
+            self.locs_3d[self.state_two_mask, 1],
+            self.locs_3d[self.state_two_mask, 2],
+            self.locs_3d[self.state_two_mask, 7],
+            x_c2,
+            y_c2,
+            z_c2,
+            cov_c2_xx,
+            cov_c2_yy,
+            cov_c2_xy,
+            cov_c2_zz,
+            det_cov_c2
+        ))
+        # now add the prior cost contribution
+        cost += (z_kink - KINK_Z_PRIOR_NM)**2/(2*KINK_Z_SIGMA_NM**2)
+        cost += (dna_length - TOTAL_DNA_LENGTH_PRIOR_NM)**2/(2*TOTAL_DNA_LENGTH_SIGMA_NM**2)
         
         return cost
     
-    def find_kink_3states(self, locs_3d):
+    def analysis_3states(self):
         '''
         This function finds the most likely position of the kink in 3d for a trace with 3 states, using the maximum likelihood method.
         '''
@@ -379,5 +447,49 @@ class EndoIVAnalysis():
         minuit = Minuit(self.calc_cost_3states_analysis, grad=None, **fit_params_w_guess)
         minuit.errordef = Minuit.LIKELIHOOD
         minuit.migrad()
+        
+        result = minuit.values.to_dict()
+        print(fit_params_w_guess)
+        print(result, minuit.valid)
+        
+        x_kink, y_kink = kink_localizer(
+            np.array((result['x_c0'], result['y_c0'], result['z_c0'])),
+            np.array((result['x_c1'], result['y_c1'], result['z_c1'])),
+            result['z_kink'],
+            result['dna_length'] - result['z_kink']
+        )
+        proj_dist_state2 = np.sqrt(
+            (result['x_c2'] - x_kink)**2 + (result['y_c2'] - y_kink)**2
+        )
+        z_c2 = result['z_kink'] + np.sqrt((result['dna_length'] - result['z_kink'])**2 - proj_dist_state2**2)
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        state_zero_mask = np.isclose(self.locs_3d[:, 6], 0)
+        state_one_mask = np.isclose(self.locs_3d[:, 6], 1)
+        state_two_mask = np.isclose(self.locs_3d[:, 6], 2)
+
+        ax.scatter(self.locs_3d[state_zero_mask, 1], self.locs_3d[state_zero_mask, 2], self.locs_3d[state_zero_mask, 7], color='blue', s=50, alpha=0.1)
+        ax.scatter(self.locs_3d[state_one_mask, 1], self.locs_3d[state_one_mask, 2], self.locs_3d[state_one_mask, 7], color='green', s=50, alpha=0.1)
+        ax.scatter(self.locs_3d[state_two_mask, 1], self.locs_3d[state_two_mask, 2], self.locs_3d[state_two_mask, 7], color='red', s=50, alpha=0.1)
+
+        ax.scatter(result['x_c0'], result['y_c0'], result['z_c0'], color='blue', s=200, alpha=1, marker='*')
+        ax.scatter(result['x_c1'], result['y_c1'], result['z_c1'], color='green', s=200, alpha=1, marker='*')
+        ax.scatter(result['x_c2'], result['y_c2'], z_c2, color='red', s=200, alpha=1, marker='*')
+        ax.scatter(x_kink, y_kink, result['z_kink'], color='black', s=200, alpha=1, marker='o')
+        
+        ax.set_zlim([0,20])
+        ax.set_box_aspect([
+            np.ptp(self.locs_3d[:, 1]),
+            np.ptp(self.locs_3d[:, 2]),
+            20
+        ])
+
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        plt.show()
         
         
