@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from iminuit import Minuit
 
+from functools import partial
 from hmmlearn.hmm import GaussianHMM
 from sklearn.mixture import GaussianMixture
+from matplotlib.animation import FuncAnimation
 
 from tracking_analysis.postprocessing import DataPostProcessor
 from tracking_analysis.config.configvar import HMM_WLT_SUFFIX
@@ -17,6 +19,11 @@ KINK_Z_PRIOR_NM = 15
 KINK_Z_SIGMA_NM = 0.05
 TOTAL_DNA_LENGTH_PRIOR_NM = 19.3
 TOTAL_DNA_LENGTH_SIGMA_NM = 0.04
+
+state_zero_col = "#4dac26"
+state_one_col = "#e66101"
+state_two_col = '#225ea8'
+dye_col = '#d01c8b'
 
 def cost_single_point(x, y, z, x0, y0, z0, cov_xx, cov_yy, cov_xy, cov_zz, det_cov):
     delta_x = x - x0
@@ -73,6 +80,51 @@ def kink_localizer(coord_down, coord_up, z_kink, arm_length):
         
     return x_kink, y_kink             
 
+def anim_update_func(
+    frame,
+    locs_3d,
+    coords_kink,
+    coords_c0,
+    coords_c1,
+    coords_c2,
+    mask_state_zero,
+    mask_state_one,
+    mask_state_two,
+    scat_state_zero,
+    scat_state_one,
+    scat_state_two,
+    dye_scat,
+    dna_arm_line
+):
+    scat_state_zero._offsets3d = (
+        locs_3d[:frame, 1][mask_state_zero[:frame]],
+        locs_3d[:frame, 2][mask_state_zero[:frame]],
+        locs_3d[:frame, 7][mask_state_zero[:frame]],
+    )
+    scat_state_one._offsets3d = (
+        locs_3d[:frame, 1][mask_state_one[:frame]],
+        locs_3d[:frame, 2][mask_state_one[:frame]],
+        locs_3d[:frame, 7][mask_state_one[:frame]],
+    )   
+    scat_state_two._offsets3d = (
+        locs_3d[:frame, 1][mask_state_two[:frame]],
+        locs_3d[:frame, 2][mask_state_two[:frame]],
+        locs_3d[:frame, 7][mask_state_two[:frame]],
+    )
+    if np.isclose(locs_3d[frame, 6], 0):
+        dye_scat._offsets3d = coords_c0
+        dna_arm_line.set_data([coords_kink[0], coords_c0[0][0]], [coords_kink[1], coords_c0[1][0]])
+        dna_arm_line.set_3d_properties([coords_kink[2], coords_c0[2][0]])
+    elif np.isclose(locs_3d[frame, 6], 1):
+        dye_scat._offsets3d = coords_c1
+        dna_arm_line.set_data([coords_kink[0], coords_c1[0][0]], [coords_kink[1], coords_c1[1][0]])
+        dna_arm_line.set_3d_properties([coords_kink[2], coords_c1[2][0]])
+    elif np.isclose(locs_3d[frame, 6], 2):
+        dye_scat._offsets3d = coords_c2
+        dna_arm_line.set_data([coords_kink[0], coords_c2[0][0]], [coords_kink[1], coords_c2[1][0]])
+        dna_arm_line.set_3d_properties([coords_kink[2], coords_c2[2][0]])
+    return [scat_state_zero, scat_state_one, scat_state_two, dye_scat, dna_arm_line]
+
 class EndoIVAnalysis():
     def __init__(self, post_proc_data: DataPostProcessor, locs_filepath: Path, tcspc_data_dir: Path, hmm_filt_done: bool):
         self.post_proc_data = post_proc_data
@@ -87,12 +139,14 @@ class EndoIVAnalysis():
             #self.get_jump_bins(self.post_proc_data.locs_centered, self.hidden_states)
             self.locs_hmmfilt = self.hmm_filter(self.post_proc_data.locs_centered, self.hidden_states)
         self.locs_3d = self.calc_height(self.locs_hmmfilt)
+        self.num_locs = len(self.locs_3d[:,0])
+        print(f'Total number of localizations after filtering: {self.num_locs}')
         if self.how_many_states==2:
             self.plot_3d_2states(self.locs_3d)
         elif self.how_many_states==3:
             self.plot_3d_3states(self.locs_3d)
-            self.fitandplot_gauss3d_3states(self.locs_3d)
-            self.analysis_3states()
+            self.part_analysis_3states_w2states(self.locs_3d)
+            self.analysis_3states(self.locs_3d)
 
     def ask_how_many_states(self):
         
@@ -200,8 +254,8 @@ class EndoIVAnalysis():
     def plot_locs_bystate(self, locs, hidden_states):
         state_zero_mask = np.isclose(hidden_states, 0)
         state_one_mask = ~state_zero_mask
-        plt.scatter(locs[state_zero_mask, 0], locs[state_zero_mask, 1], color="blue")
-        plt.scatter(locs[state_one_mask, 0], locs[state_one_mask, 1], color="red")
+        plt.scatter(locs[state_zero_mask, 0], locs[state_zero_mask, 1], color=state_zero_col)
+        plt.scatter(locs[state_one_mask, 0], locs[state_one_mask, 1], color=state_one_col)
         plt.show()
         
     def plot_3d_2states(self, locs):
@@ -211,8 +265,8 @@ class EndoIVAnalysis():
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        ax.scatter(locs[state_zero_mask, 1], locs[state_zero_mask, 2], locs[state_zero_mask, 7], color='blue', s=50, alpha=0.4)
-        ax.scatter(locs[state_one_mask, 1], locs[state_one_mask, 2], locs[state_one_mask, 7], color='green', s=50, alpha=0.4)
+        ax.scatter(locs[state_zero_mask, 1], locs[state_zero_mask, 2], locs[state_zero_mask, 7], color=state_zero_col, s=50, alpha=0.4)
+        ax.scatter(locs[state_one_mask, 1], locs[state_one_mask, 2], locs[state_one_mask, 7], color=state_one_col, s=50, alpha=0.4)
         ax.set_box_aspect([
             np.ptp(np.concatenate((locs[state_zero_mask, 1], locs[state_one_mask, 1]))),
             np.ptp(np.concatenate((locs[state_zero_mask, 2], locs[state_one_mask, 2]))),
@@ -233,9 +287,9 @@ class EndoIVAnalysis():
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        ax.scatter(locs[state_zero_mask, 1], locs[state_zero_mask, 2], locs[state_zero_mask, 7], color='blue', s=50, alpha=0.4)
-        ax.scatter(locs[state_one_mask, 1], locs[state_one_mask, 2], locs[state_one_mask, 7], color='green', s=50, alpha=0.4)
-        ax.scatter(locs[state_two_mask, 1], locs[state_two_mask, 2], locs[state_two_mask, 7], color='red', s=50, alpha=0.4)
+        ax.scatter(locs[state_zero_mask, 1], locs[state_zero_mask, 2], locs[state_zero_mask, 7], color=state_zero_col, s=50, alpha=0.4)
+        ax.scatter(locs[state_one_mask, 1], locs[state_one_mask, 2], locs[state_one_mask, 7], color=state_one_col, s=50, alpha=0.4)
+        ax.scatter(locs[state_two_mask, 1], locs[state_two_mask, 2], locs[state_two_mask, 7], color=state_two_col, s=50, alpha=0.4)
         ax.set_box_aspect([
             np.ptp(np.concatenate((locs[state_zero_mask, 1], locs[state_one_mask, 1], locs[state_two_mask, 1]))),
             np.ptp(np.concatenate((locs[state_zero_mask, 2], locs[state_one_mask, 2], locs[state_two_mask, 2]))),
@@ -248,7 +302,7 @@ class EndoIVAnalysis():
 
         plt.show()
         
-    def fitandplot_gauss3d_3states(self, locs):
+    def part_analysis_3states_w2states(self, locs):
         self.state_zero_mask = np.isclose(locs[:, 6], 0)
         self.state_one_mask = np.isclose(locs[:, 6], 1)
         self.state_two_mask = np.isclose(locs[:, 6], 2)
@@ -288,9 +342,9 @@ class EndoIVAnalysis():
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        ax.scatter(self.means_0[0][0], self.means_0[0][1], self.means_0[0][2], color='blue', s=50, alpha=0.4)
-        ax.scatter(self.means_1[0][0], self.means_1[0][1], self.means_1[0][2], color='green', s=50, alpha=0.4)
-        ax.scatter(self.means_2[0][0], self.means_2[0][1], self.means_2[0][2], color='red', s=50, alpha=0.4)
+        ax.scatter(self.means_0[0][0], self.means_0[0][1], self.means_0[0][2], color=state_zero_col, s=50, alpha=0.4)
+        ax.scatter(self.means_1[0][0], self.means_1[0][1], self.means_1[0][2], color=state_one_col, s=50, alpha=0.4)
+        ax.scatter(self.means_2[0][0], self.means_2[0][1], self.means_2[0][2], color=state_two_col, s=50, alpha=0.4)
         ax.scatter(self.x_kink_01, self.y_kink_01, KINK_Z_PRIOR_NM, color='black', s=50, alpha=0.4, marker='o')
         ax.scatter(self.x_kink_02, self.y_kink_02, KINK_Z_PRIOR_NM, color='black', s=50, alpha=0.4, marker='s')
         ax.scatter(self.x_kink_12, self.y_kink_12, KINK_Z_PRIOR_NM, color='black', s=50, alpha=0.4, marker='^')
@@ -439,7 +493,7 @@ class EndoIVAnalysis():
         
         return cost
     
-    def analysis_3states(self):
+    def analysis_3states(self, locs_3d):
         '''
         This function finds the most likely position of the kink in 3d for a trace with 3 states, using the maximum likelihood method.
         '''
@@ -473,32 +527,31 @@ class EndoIVAnalysis():
         print('Lateral sigma state 2 (simplified):', np.sqrt((result['cov_c2_xx'] + result['cov_c2_yy'])/2))
         print('Axial sigma state 2:', np.sqrt(result['cov_c2_zz']))
         
-        
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        state_zero_mask = np.isclose(self.locs_3d[:, 6], 0)
-        state_one_mask = np.isclose(self.locs_3d[:, 6], 1)
-        state_two_mask = np.isclose(self.locs_3d[:, 6], 2)
+        state_zero_mask = np.isclose(locs_3d[:, 6], 0)
+        state_one_mask = np.isclose(locs_3d[:, 6], 1)
+        state_two_mask = np.isclose(locs_3d[:, 6], 2)
 
-        ax.scatter(self.locs_3d[state_zero_mask, 1], self.locs_3d[state_zero_mask, 2], self.locs_3d[state_zero_mask, 7], color='blue', s=50, alpha=0.1)
-        ax.scatter(self.locs_3d[state_one_mask, 1], self.locs_3d[state_one_mask, 2], self.locs_3d[state_one_mask, 7], color='green', s=50, alpha=0.1)
-        ax.scatter(self.locs_3d[state_two_mask, 1], self.locs_3d[state_two_mask, 2], self.locs_3d[state_two_mask, 7], color='red', s=50, alpha=0.1)
+        ax.scatter(locs_3d[state_zero_mask, 1], locs_3d[state_zero_mask, 2], locs_3d[state_zero_mask, 7], color=state_zero_col, s=50, alpha=0.1)
+        ax.scatter(locs_3d[state_one_mask, 1], locs_3d[state_one_mask, 2], locs_3d[state_one_mask, 7], color=state_one_col, s=50, alpha=0.1)
+        ax.scatter(locs_3d[state_two_mask, 1], locs_3d[state_two_mask, 2], locs_3d[state_two_mask, 7], color=state_two_col, s=50, alpha=0.1)
 
-        ax.scatter(result['x_c0'], result['y_c0'], result['z_c0'], color='blue', s=400, alpha=1, marker='*')
-        ax.scatter(result['x_c1'], result['y_c1'], result['z_c1'], color='green', s=400, alpha=1, marker='*')
-        ax.scatter(result['x_c2'], result['y_c2'], z_c2, color='red', s=400, alpha=1, marker='*')
+        ax.scatter(result['x_c0'], result['y_c0'], result['z_c0'], color=state_zero_col, s=400, alpha=1, marker='*')
+        ax.scatter(result['x_c1'], result['y_c1'], result['z_c1'], color=state_one_col, s=400, alpha=1, marker='*')
+        ax.scatter(result['x_c2'], result['y_c2'], z_c2, color=state_two_col, s=400, alpha=1, marker='*')
         ax.scatter(x_kink, y_kink, result['z_kink'], color='black', s=100, alpha=1, marker='o')
         
-        ax.plot([x_kink, x_kink], [y_kink, y_kink], [0, result['z_kink']], lw='5', alpha=0.7, color='gray')
-        ax.plot([x_kink, result['x_c0']], [y_kink, result['y_c0']], [result['z_kink'], result['z_c0']], lw='5', alpha=0.7, color='gray')
-        ax.plot([x_kink, result['x_c1']], [y_kink, result['y_c1']], [result['z_kink'], result['z_c1']], lw='5', alpha=0.7, color='gray')
-        ax.plot([x_kink, result['x_c2']], [y_kink, result['y_c2']], [result['z_kink'], z_c2], lw='5', alpha=0.7, color='gray')
+        ax.plot([x_kink, x_kink], [y_kink, y_kink], [0, result['z_kink']], lw='10', alpha=0.7, color='gray')
+        ax.plot([x_kink, result['x_c0']], [y_kink, result['y_c0']], [result['z_kink'], result['z_c0']], lw='10', alpha=0.7, color='gray')
+        ax.plot([x_kink, result['x_c1']], [y_kink, result['y_c1']], [result['z_kink'], result['z_c1']], lw='10', alpha=0.7, color='gray')
+        ax.plot([x_kink, result['x_c2']], [y_kink, result['y_c2']], [result['z_kink'], z_c2], lw='10', alpha=0.7, color='gray')
         
         ax.set_zlim([0,20])
         ax.set_box_aspect([
-            np.ptp(self.locs_3d[:, 1]),
-            np.ptp(self.locs_3d[:, 2]),
+            np.ptp(locs_3d[:, 1]),
+            np.ptp(locs_3d[:, 2]),
             20
         ])
 
@@ -508,4 +561,47 @@ class EndoIVAnalysis():
 
         plt.show()
         
+        fig_foranim = plt.figure()
+        ax = fig_foranim.add_subplot(111, projection='3d') 
+        
+        scat_state_zero = ax.scatter(locs_3d[state_zero_mask, 1], locs_3d[state_zero_mask, 2], locs_3d[state_zero_mask, 7], color=state_zero_col, s=50, alpha=0.1)
+        scat_state_one = ax.scatter(locs_3d[state_one_mask, 1], locs_3d[state_one_mask, 2], locs_3d[state_one_mask, 7], color=state_one_col, s=50, alpha=0.1)
+        scat_state_two = ax.scatter(locs_3d[state_two_mask, 1], locs_3d[state_two_mask, 2], locs_3d[state_two_mask, 7], color=state_two_col, s=50, alpha=0.1)
+
+        dye_scat = ax.scatter([result['x_c0']], [result['y_c0']], [result['z_c0']], color=dye_col, s=400, alpha=1, marker='*')
+        ax.scatter(x_kink, y_kink, result['z_kink'], color='black', s=80, alpha=1, marker='o')
+        
+        ax.plot([x_kink, x_kink], [y_kink, y_kink], [0, result['z_kink']], lw='10', alpha=0.7, color='gray')
+        dna_arm_line, = ax.plot([x_kink, result['x_c0']], [y_kink, result['y_c0']], [result['z_kink'], result['z_c0']], lw='10', alpha=0.7, color='gray')
+        
+        ax.set_zlim([0,20])
+        ax.set_box_aspect([
+            np.ptp(locs_3d[:, 1]),
+            np.ptp(locs_3d[:, 2]),
+            20
+        ])
+        
+        anim_3d = FuncAnimation(
+            fig_foranim,
+            partial(anim_update_func,
+                locs_3d=locs_3d,
+                coords_kink=(x_kink, y_kink, result['z_kink']),
+                coords_c0=([result['x_c0']], [result['y_c0']], [result['z_c0']]),
+                coords_c1=([result['x_c1']], [result['y_c1']], [result['z_c1']]),
+                coords_c2=([result['x_c2']], [result['y_c2']], [z_c2]),
+                mask_state_zero=self.state_zero_mask,
+                mask_state_one=self.state_one_mask,
+                mask_state_two=self.state_two_mask,
+                scat_state_zero=scat_state_zero,
+                scat_state_one=scat_state_one,
+                scat_state_two=scat_state_two,
+                dye_scat=dye_scat,
+                dna_arm_line=dna_arm_line
+                ),
+            frames=self.num_locs,
+            interval=50,
+            blit=False
+        )
+        
+        plt.show()
         
