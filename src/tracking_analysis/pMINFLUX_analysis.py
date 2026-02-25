@@ -55,14 +55,29 @@ from tracking_analysis.endoivanalysis import EndoIVAnalysis
 
 plt.close('all')
 
-date = '20260129'
-
-meas_name = 'g1_mol3'
 channel_name = 'red'
-meas_number = 2
-
-ebp_number = 2
 color = 'r'
+
+date = '20260129'
+meas_name = 'g1_mol3' # best 3 state trace
+meas_number = 2
+ebp_number = 2
+
+#date = '20260122'
+#meas_name = 'g1_mol2'
+#meas_number = 1
+#meas_name = 'g1_mol3' # molecule for 2 state trace
+#meas_number = 5
+#meas_name = 'g1_mol6' # molecule for 1 state trace
+#meas_number = 1
+#ebp_number = 0
+
+#date = '20260123'
+#meas_name = 'g1_APPTO45_mol1'
+#meas_number = 1
+#meas_name = 'g1_APPTO45_mol3'
+#meas_number = 0
+#ebp_number = 4
 
 if meas_number==0:
     filename_base = meas_name + '_' + channel_name + '_' + date

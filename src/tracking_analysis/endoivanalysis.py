@@ -8,6 +8,7 @@ from functools import partial
 from hmmlearn.hmm import GaussianHMM
 from sklearn.mixture import GaussianMixture
 from matplotlib.animation import FuncAnimation
+import matplotlib.gridspec as gridspec
 
 from tracking_analysis.postprocessing import DataPostProcessor
 from tracking_analysis.config.configvar import HMM_WLT_SUFFIX
@@ -16,7 +17,7 @@ D0_ATTO643_NM = 18.5
 TAU0_ATTO643_NS = 3.9
 ARM_LENGTH_PRIOR_NM = 4.3
 KINK_Z_PRIOR_NM = 15
-KINK_Z_SIGMA_NM = 0.05
+KINK_Z_SIGMA_NM = 0.03
 TOTAL_DNA_LENGTH_PRIOR_NM = 19.3
 TOTAL_DNA_LENGTH_SIGMA_NM = 0.04
 
@@ -94,7 +95,10 @@ def anim_update_func(
     scat_state_one,
     scat_state_two,
     dye_scat,
-    dna_arm_line
+    dna_arm_line,
+    lt_plot_state_zero,
+    lt_plot_state_one,
+    lt_plot_state_two
 ):
     scat_state_zero._offsets3d = (
         locs_3d[:frame, 1][mask_state_zero[:frame]],
@@ -123,7 +127,31 @@ def anim_update_func(
         dye_scat._offsets3d = coords_c2
         dna_arm_line.set_data([coords_kink[0], coords_c2[0][0]], [coords_kink[1], coords_c2[1][0]])
         dna_arm_line.set_3d_properties([coords_kink[2], coords_c2[2][0]])
-    return [scat_state_zero, scat_state_one, scat_state_two, dye_scat, dna_arm_line]
+        
+    lt_plot_state_zero.set_offsets(
+        np.c_[locs_3d[:frame, 0][mask_state_zero[:frame]],
+        locs_3d[:frame, 5][mask_state_zero[:frame]]]
+    )
+    lt_plot_state_one.set_offsets(
+        np.c_[locs_3d[:frame, 0][mask_state_one[:frame]],
+        locs_3d[:frame, 5][mask_state_one[:frame]]]
+    )   
+    lt_plot_state_two.set_offsets(
+        np.c_[locs_3d[:frame, 0][mask_state_two[:frame]],
+        locs_3d[:frame, 5][mask_state_two[:frame]]]
+    )
+        
+    artist_list = [
+        scat_state_zero,
+        scat_state_one,
+        scat_state_two,
+        dye_scat,
+        dna_arm_line,
+        lt_plot_state_zero,
+        lt_plot_state_one,
+        lt_plot_state_two
+    ]
+    return artist_list
 
 class EndoIVAnalysis():
     def __init__(self, post_proc_data: DataPostProcessor, locs_filepath: Path, tcspc_data_dir: Path, hmm_filt_done: bool):
@@ -562,24 +590,66 @@ class EndoIVAnalysis():
         plt.show()
         
         fig_foranim = plt.figure()
-        ax = fig_foranim.add_subplot(111, projection='3d') 
         
-        scat_state_zero = ax.scatter(locs_3d[state_zero_mask, 1], locs_3d[state_zero_mask, 2], locs_3d[state_zero_mask, 7], color=state_zero_col, s=50, alpha=0.1)
-        scat_state_one = ax.scatter(locs_3d[state_one_mask, 1], locs_3d[state_one_mask, 2], locs_3d[state_one_mask, 7], color=state_one_col, s=50, alpha=0.1)
-        scat_state_two = ax.scatter(locs_3d[state_two_mask, 1], locs_3d[state_two_mask, 2], locs_3d[state_two_mask, 7], color=state_two_col, s=50, alpha=0.1)
+        gs = gridspec.GridSpec(
+            2, 1,
+            height_ratios=[4, 1],
+            figure=fig_foranim,
+            hspace=0.0001
+        )
+        
+        ax_3d = fig_foranim.add_subplot(gs[0], projection='3d') 
+        ax_3d.set_position([0.1, 0.2, 0.8, 0.9])
+        
+        scat_state_zero = ax_3d.scatter([], [], [], color=state_zero_col, s=50, alpha=0.05)
+        scat_state_one = ax_3d.scatter([], [], [], color=state_one_col, s=50, alpha=0.05)
+        scat_state_two = ax_3d.scatter([], [], [], color=state_two_col, s=50, alpha=0.05)
 
-        dye_scat = ax.scatter([result['x_c0']], [result['y_c0']], [result['z_c0']], color=dye_col, s=400, alpha=1, marker='*')
-        ax.scatter(x_kink, y_kink, result['z_kink'], color='black', s=80, alpha=1, marker='o')
+        dye_scat = ax_3d.scatter([], [], [], color=dye_col, s=400, alpha=1, marker='*')
+        ax_3d.scatter(x_kink, y_kink, result['z_kink'], color='black', s=80, alpha=1, marker='o')
         
-        ax.plot([x_kink, x_kink], [y_kink, y_kink], [0, result['z_kink']], lw='10', alpha=0.7, color='gray')
-        dna_arm_line, = ax.plot([x_kink, result['x_c0']], [y_kink, result['y_c0']], [result['z_kink'], result['z_c0']], lw='10', alpha=0.7, color='gray')
+        ax_3d.plot([x_kink, x_kink], [y_kink, y_kink], [np.min(locs_3d[:,7]) - np.ptp(locs_3d[:, 7])*0.05, result['z_kink']], lw='10', alpha=0.7, color='gray')
+        dna_arm_line, = ax_3d.plot([], [], [], lw='10', alpha=0.7, color='gray')
         
-        ax.set_zlim([0,20])
-        ax.set_box_aspect([
+        ax_3d.set_xlim([np.min(locs_3d[:,1]) - np.ptp(locs_3d[:, 1])*0.05, np.max(locs_3d[:,1]) + np.ptp(locs_3d[:, 1])*0.05])
+        ax_3d.set_ylim([np.min(locs_3d[:,2]) - np.ptp(locs_3d[:, 2])*0.05, np.max(locs_3d[:,2]) + np.ptp(locs_3d[:, 2])*0.05])
+        ax_3d.set_zlim([np.min(locs_3d[:,7]) - np.ptp(locs_3d[:, 7])*0.05, np.max(locs_3d[:,7]) + np.ptp(locs_3d[:, 7])*0.05])
+        ax_3d.set_box_aspect([
             np.ptp(locs_3d[:, 1]),
             np.ptp(locs_3d[:, 2]),
-            20
+            np.ptp(locs_3d[:, 7])
         ])
+        
+        fig.subplots_adjust(
+            top=0.999,
+            bottom=0.05
+        )
+        ax_3d.tick_params(axis='x', pad=0)
+        ax_3d.tick_params(axis='y', pad=0)
+        ax_3d.tick_params(axis='z', pad=0)
+        ax_3d.set_xticks([10, 15, 20, 25])
+        ax_3d.set_yticks([45, 50, 55])
+        ax_3d.set_zticks([12, 14, 16])
+        ax_3d.set_xlabel('x [nm]')
+        ax_3d.set_ylabel('y [nm]')
+        ax_3d.set_zlabel('z [nm]')
+        ax_3d.xaxis.labelpad = 0
+        ax_3d.yaxis.labelpad = 0
+        ax_3d.zaxis.labelpad = 0
+        
+        ax_lt_plot = fig_foranim.add_subplot(gs[1])
+        
+        lt_plot_state_zero = ax_lt_plot.scatter([], [], color=state_zero_col, s=50, alpha=0.3)
+        lt_plot_state_one = ax_lt_plot.scatter([], [], color=state_one_col, s=50, alpha=0.3)
+        lt_plot_state_two = ax_lt_plot.scatter([], [], color=state_two_col, s=50, alpha=0.3)
+        
+        ax_lt_plot.set_xlabel('t [s]')
+        ax_lt_plot.set_ylabel(r"$\tau$ [ns]")
+        
+        ax_lt_plot.set_xlim([np.min(locs_3d[:,0]), np.max(locs_3d[:,0])])
+        ax_lt_plot.set_ylim([np.min(locs_3d[:,5]) - np.ptp(locs_3d[:, 5])*0.05, np.max(locs_3d[:,5]) + np.ptp(locs_3d[:, 5])*0.05])
+        
+        ax_3d.view_init(elev=20, azim=235)
         
         anim_3d = FuncAnimation(
             fig_foranim,
@@ -596,12 +666,17 @@ class EndoIVAnalysis():
                 scat_state_one=scat_state_one,
                 scat_state_two=scat_state_two,
                 dye_scat=dye_scat,
-                dna_arm_line=dna_arm_line
+                dna_arm_line=dna_arm_line,
+                lt_plot_state_zero=lt_plot_state_zero,
+                lt_plot_state_one=lt_plot_state_one,
+                lt_plot_state_two=lt_plot_state_two
                 ),
             frames=self.num_locs,
             interval=50,
             blit=False
         )
+        
+        anim_3d.save("3state_trace.mp4", writer="ffmpeg", fps=20)
         
         plt.show()
         
